@@ -1,6 +1,7 @@
 package nahlib;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.net.URL;
 import java.util.List;
@@ -11,7 +12,7 @@ public class RegisterPage extends JFrame {
     private final JTextField tfUsername = Utils.input("");
     private final JPasswordField tfPass = Utils.passInput("");
     private final JTextField tfNama = Utils.input("");
-    private final JTextField tfKelas = Utils.input("");
+    private final JComboBox<String> cbKelas = new JComboBox<>();
     private final JComboBox<String> cbGender = new JComboBox<>(new String[]{"Laki-laki", "Perempuan"});
     private final JTextField tfTelp = Utils.input("");
     private final JTextField tfEmail = Utils.input("");
@@ -22,6 +23,16 @@ public class RegisterPage extends JFrame {
         setUndecorated(true);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        
+        // Populate class options (VII-A to IX-E)
+        cbKelas.addItem(""); // Empty option
+        String[] grades = {"VII", "VIII", "IX"};
+        String[] sections = {"A", "B", "C", "D", "E"};
+        for (String grade : grades) {
+            for (String section : sections) {
+                cbKelas.addItem(grade + "-" + section);
+            }
+        }
         
         Utils.numericOnly(tfTelp);
 
@@ -100,27 +111,24 @@ public class RegisterPage extends JFrame {
         styleField(tfUsername);
         styleField(tfPass);
         styleField(tfNama);
-        styleField(tfKelas);
         styleField(tfTelp);
         styleField(tfEmail);
         
+        // Style combo boxes
+        styleComboBox(cbKelas);
+        styleComboBox(cbGender);
+        
         // Fix background rendering artifacts
-        JTextField[] tfs = {tfUsername, tfNama, tfKelas, tfTelp, tfEmail};
+        JTextField[] tfs = {tfUsername, tfNama, tfTelp, tfEmail};
         for (JTextField f : tfs) f.setOpaque(false);
         tfPass.setOpaque(false);
         
         // Enter Navigation (Chain)
         tfUsername.addActionListener(e -> tfPass.requestFocus());
         tfPass.addActionListener(e -> tfNama.requestFocus());
-        tfNama.addActionListener(e -> tfKelas.requestFocus());
-        tfKelas.addActionListener(e -> cbGender.requestFocus());
+        tfNama.addActionListener(e -> cbKelas.requestFocus());
         tfTelp.addActionListener(e -> tfEmail.requestFocus());
         tfEmail.addActionListener(e -> taAlamat.requestFocus());
-        
-        cbGender.setBackground(new Color(255, 255, 255, 10));
-        cbGender.setForeground(Color.WHITE);
-        cbGender.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        cbGender.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 30)));
         
         taAlamat.setOpaque(false);
         taAlamat.setBackground(new Color(255, 255, 255, 14));
@@ -156,7 +164,7 @@ public class RegisterPage extends JFrame {
         gbc.gridx = 0; gbc.gridy = 3; formPanel.add(createLabel("FULL NAME *"), gbc);
         gbc.gridx = 1; formPanel.add(createLabel("CLASS"), gbc);
         gbc.gridx = 0; gbc.gridy = 4; formPanel.add(tfNama, gbc);
-        gbc.gridx = 1; formPanel.add(tfKelas, gbc);
+        gbc.gridx = 1; formPanel.add(cbKelas, gbc);
 
         // Row 4: Gender & Telp
         gbc.gridx = 0; gbc.gridy = 5; formPanel.add(createLabel("GENDER"), gbc);
@@ -382,6 +390,31 @@ public class RegisterPage extends JFrame {
         }
     }
 
+    private void styleComboBox(JComboBox<?> cb) {
+        cb.setBackground(new Color(255, 255, 255, 14));
+        cb.setForeground(Color.WHITE);
+        cb.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        cb.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 25)));
+        cb.setFocusable(false);
+        cb.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                JLabel l = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                l.setBackground(isSelected ? new Color(66, 133, 244) : new Color(40, 45, 62));
+                l.setForeground(Color.WHITE);
+                l.setBorder(new EmptyBorder(5, 10, 5, 10));
+                return l;
+            }
+        });
+        
+        // Fix for unreadable white popup background
+        Object child = cb.getAccessibleContext().getAccessibleChild(0);
+        if (child instanceof javax.swing.plaf.basic.BasicComboPopup) {
+            ((javax.swing.plaf.basic.BasicComboPopup)child).getList().setBackground(new Color(40, 45, 62));
+            ((javax.swing.plaf.basic.BasicComboPopup)child).getList().setForeground(Color.WHITE);
+        }
+    }
+
     private JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
         label.setFont(new Font("Segoe UI", Font.BOLD, 10));
@@ -394,7 +427,8 @@ public class RegisterPage extends JFrame {
             String username = tfUsername.getText().trim();
             String pass = new String(tfPass.getPassword());
             String nama = tfNama.getText().trim();
-            String kelas = tfKelas.getText().trim();
+            String kelas = (String) cbKelas.getSelectedItem();
+            if (kelas != null) kelas = kelas.trim();
             String gender = (String) cbGender.getSelectedItem();
             String telp = tfTelp.getText().trim();
             String email = tfEmail.getText().trim();

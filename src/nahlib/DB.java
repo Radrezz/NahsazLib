@@ -19,6 +19,7 @@ public class DB {
             if (conn != null && !conn.isClosed()) return conn;
             conn = DriverManager.getConnection(URL, USER, PASS);
             initOperationalHours();
+            checkSchema();
             return conn;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -241,6 +242,74 @@ public class DB {
         void run() throws Exception;
     }
 
+    // ====== CHECK LIBRARY OPERATIONAL STATUS ======
+    public static boolean isLibraryOpen() {
+        try {
+            // Get current day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            int dayIndex = cal.get(java.util.Calendar.DAY_OF_WEEK) - 1; // Convert to 0-based
+            
+            // Get current time
+            java.text.SimpleDateFormat timeFormat = new java.text.SimpleDateFormat("HH:mm:ss");
+            String currentTime = timeFormat.format(new java.util.Date());
+            
+            // Query operational hours for today
+            var result = query("SELECT is_open, open_time, close_time FROM operational_hours WHERE day_index = ?", dayIndex);
+            
+            if (result.isEmpty()) {
+                return true; // Default to open if no data
+            }
+            
+            var today = result.get(0);
+            int isOpen = toInt(today.get("is_open"), 1);
+            
+            // If library is closed today
+            if (isOpen == 0) {
+                return false;
+            }
+            
+            // Check if current time is within operational hours
+            String openTime = today.get("open_time");
+            String closeTime = today.get("close_time");
+            
+            return currentTime.compareTo(openTime) >= 0 && currentTime.compareTo(closeTime) <= 0;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return true; // Default to open on error
+        }
+    }
+    
+    // Get library status message
+    public static String getLibraryStatusMessage() {
+        try {
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            int dayIndex = cal.get(java.util.Calendar.DAY_OF_WEEK) - 1;
+            
+            var result = query("SELECT day_name, is_open, open_time, close_time FROM operational_hours WHERE day_index = ?", dayIndex);
+            
+            if (result.isEmpty()) {
+                return "Perpustakaan buka";
+            }
+            
+            var today = result.get(0);
+            int isOpen = toInt(today.get("is_open"), 1);
+            String dayName = today.get("day_name");
+            
+            if (isOpen == 0) {
+                return "Perpustakaan tutup pada hari " + dayName;
+            }
+            
+            String openTime = today.get("open_time").substring(0, 5); // HH:mm
+            String closeTime = today.get("close_time").substring(0, 5);
+            
+            return "Perpustakaan buka: " + openTime + " - " + closeTime;
+            
+        } catch (Exception e) {
+            return "Perpustakaan buka";
+        }
+    }
+
     private static void initOperationalHours() {
         try {
             // Create table if not exists
@@ -263,5 +332,23 @@ public class DB {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+    
+    private static void checkSchema() {
+        try {
+            // Check 'description' in 'users'
+            try {
+                conn.createStatement().executeQuery("SELECT description FROM users LIMIT 1");
+            } catch (SQLException e) {
+                exec("ALTER TABLE users ADD COLUMN description TEXT");
+            }
+
+            // Check 'description' in 'books'
+            try {
+                conn.createStatement().executeQuery("SELECT description FROM books LIMIT 1");
+            } catch (SQLException e) {
+                exec("ALTER TABLE books ADD COLUMN description TEXT");
+            }
+        } catch (Exception ignored) { }
     }
 }

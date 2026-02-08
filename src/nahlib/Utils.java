@@ -1,5 +1,6 @@
 package nahlib;
 
+import com.toedter.calendar.JDateChooser;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -17,32 +18,50 @@ public class Utils {
     public static Image makeCircularImage(Image src, int size) {
         if (src == null) return null;
         
-        // Force full load using ImageIcon
+        // Ensure image is fully loaded
         src = new ImageIcon(src).getImage();
         int w = src.getWidth(null);
         int h = src.getHeight(null);
         
-        // HD Processing: Use at least 2x target size or the original image hardware resolution
-        // to prevent "burik" or pixelated results when scaled.
-        int renderSize = Math.max(size * 2, Math.max(w, h));
+        if (w <= 0 || h <= 0) return null;
         
-        BufferedImage buffer = new BufferedImage(renderSize, renderSize, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = buffer.createGraphics();
+        // Create a high-quality scaled version first (Master Image)
+        // We use a larger intermediate size (e.g., 4x target size) for better downsampling quality
+        int renderSize = Math.max(size * 4, Math.min(w, h));
         
-        // Set Ultra Rendering Hints
+        BufferedImage master = new BufferedImage(renderSize, renderSize, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = master.createGraphics();
+        
+        // Set Ultra-High Quality Rendering Hints
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g2.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
         g2.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);
-        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        
-        // Draw the HD circular version
+        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+
+        // Circular Clip
         g2.setClip(new Ellipse2D.Double(0, 0, renderSize, renderSize));
-        g2.drawImage(src, 0, 0, renderSize, renderSize, null);
+        
+        // Draw image centered and covering the area (Cover Mode)
+        // Calculate scaling to cover the renderSize
+        double scale = Math.max((double)renderSize/w, (double)renderSize/h);
+        int dw = (int)(w * scale);
+        int dh = (int)(h * scale);
+        int dx = (renderSize - dw) / 2;
+        int dy = (renderSize - dh) / 2;
+        
+        g2.drawImage(src, dx, dy, dw, dh, null);
+        
+        // Optional: Add a subtle border to smooth edges against dark background
+        g2.setStroke(new BasicStroke(renderSize * 0.02f)); // 2% border thickness
+        g2.setColor(new Color(255, 255, 255, 20)); // Faint white border
+        g2.drawOval(0, 0, renderSize, renderSize);
+        
         g2.dispose();
         
-        // Final smooth transition to the target size
-        return buffer.getScaledInstance(size, size, Image.SCALE_SMOOTH);
+        // High quality downscale to final target size
+        return master.getScaledInstance(size, size, Image.SCALE_SMOOTH);
     }
     
     // Palette sesuai tema gelap + aksen biru
@@ -130,6 +149,27 @@ public class Utils {
         return t;
     }
 
+    public static JDateChooser dateChooser() {
+        JDateChooser dc = new JDateChooser();
+        dc.setDateFormatString("yyyy-MM-dd");
+        dc.setBackground(CARD2);
+        dc.setForeground(TEXT);
+        dc.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(BORDER),
+            new EmptyBorder(5, 5, 5, 5)
+        ));
+        
+        // Style the text field inside JDateChooser
+        JTextField dateField = ((JTextField) dc.getDateEditor().getUiComponent());
+        dateField.setBackground(CARD2);
+        dateField.setForeground(TEXT);
+        dateField.setCaretColor(TEXT);
+        dateField.setFont(FONT);
+        dateField.setBorder(new EmptyBorder(5, 5, 5, 5));
+        
+        return dc;
+    }
+
     // numeric-only sesuai perintah: field angka tidak boleh huruf
     public static void numericOnly(JTextField field) {
         ((AbstractDocument) field.getDocument()).setDocumentFilter(new DocumentFilter() {
@@ -178,6 +218,103 @@ public class Utils {
         table.setDefaultRenderer(Object.class, r);
     }
 
+    // Updated: Image Utils with native FileDialog for "not old-fashioned" look & previews
+    public static File selectImage(Component parent) {
+        Window window = SwingUtilities.getWindowAncestor(parent);
+        FileDialog fd;
+        if (window instanceof Frame) {
+            fd = new FileDialog((Frame) window, "Pilih Gambar Sampul", FileDialog.LOAD);
+        } else if (window instanceof Dialog) {
+            fd = new FileDialog((Dialog) window, "Pilih Gambar Sampul", FileDialog.LOAD);
+        } else {
+            fd = new FileDialog((Frame) null, "Pilih Gambar Sampul", FileDialog.LOAD);
+        }
+        
+        fd.setFile("*.jpg;*.jpeg;*.png;*.webp");
+        fd.setVisible(true);
+        
+        if (fd.getFile() != null) {
+            return new File(fd.getDirectory(), fd.getFile());
+        }
+        return null;
+    }
+
+    public static String saveCover(File file) {
+        if (file == null) return null;
+        try {
+            File dir = new File("uploads/covers");
+            if (!dir.exists()) dir.mkdirs();
+            
+            String ext = file.getName().substring(file.getName().lastIndexOf("."));
+            String filename = "cover_" + System.currentTimeMillis() + ext;
+            File dest = new File(dir, filename);
+            
+            java.nio.file.Files.copy(file.toPath(), dest.toPath());
+            return "uploads/covers/" + filename;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static ImageIcon getCover(String path, int width, int height) {
+        if (path == null || path.isEmpty()) return null;
+        try {
+            File f = new File(path);
+            if (!f.exists()) return null;
+            BufferedImage img = ImageIO.read(f);
+            if (img == null) return null;
+            
+            return new ImageIcon(smartScale(img, width, height));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static Image scaleImage(Image src, int w, int h) {
+        if (src instanceof BufferedImage) {
+            return smartScale((BufferedImage) src, w, h);
+        }
+        return src.getScaledInstance(w, h, Image.SCALE_SMOOTH);
+    }
+
+    public static BufferedImage smartScale(BufferedImage src, int targetW, int targetH) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        
+        double ratio = (double) targetW / targetH;
+        double imgRatio = (double) w / h;
+        
+        int finalW, finalH;
+        if (imgRatio > ratio) {
+            // Image is wider than target ratio (landscape-ish)
+            finalH = targetH;
+            finalW = (int) (targetH * imgRatio);
+        } else {
+            // Image is taller than target ratio (portrait-ish)
+            finalW = targetW;
+            finalH = (int) (targetW / imgRatio);
+        }
+        
+        Image scaled = src.getScaledInstance(finalW, finalH, Image.SCALE_SMOOTH);
+        BufferedImage output = new BufferedImage(targetW, targetH, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = output.createGraphics();
+        
+        // High quality rendering hints
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        
+        // Center crop logic: calculate offsets
+        int x = (targetW - finalW) / 2;
+        int y = (targetH - finalH) / 2;
+        
+        g2.drawImage(scaled, x, y, null);
+        g2.dispose();
+        
+        return output;
+    }
+
     public static JPanel bottomNav(String[] labels, Runnable[] actions, int activeIndex) {
         JPanel bar = new JPanel(new GridLayout(1, labels.length, 10, 0));
         bar.setBackground(BG);
@@ -195,7 +332,60 @@ public class Utils {
         return bar;
     }
 
-   public static String getLibraryName() {
+    public static JPanel createRootPanel(LayoutManager layout) {
+        return new JPanel(layout) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // Same gradient as LoginPage for consistency
+                GradientPaint gp = new GradientPaint(0, 0, new Color(25, 28, 40), getWidth(), getHeight(), new Color(40, 45, 62));
+                g2.setPaint(gp);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                
+                // Decorative circles
+                g2.setColor(new Color(255, 255, 255, 5));
+                g2.fillOval(-100, -100, 400, 400);
+                g2.fillOval(getWidth() - 300, getHeight() - 300, 500, 500);
+            }
+        };
+    }
+
+    public static JButton createCloseButton(Window window) {
+        JButton btnClose = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Red Circle Background
+                g2.setColor(getModel().isRollover() ? new Color(255, 80, 80) : new Color(230, 50, 50));
+                g2.fillOval(2, 2, getWidth()-4, getHeight()-4);
+                
+                // White X
+                g2.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.setColor(Color.WHITE);
+                int p = 10;
+                int sz = getWidth() - (p * 2);
+                g2.drawLine(p, p, p + sz, p + sz);
+                g2.drawLine(p + sz, p, p, p + sz);
+                
+                g2.dispose();
+            }
+        };
+        btnClose.setPreferredSize(new Dimension(34, 34));
+        btnClose.setContentAreaFilled(false);
+        btnClose.setBorderPainted(false);
+        btnClose.setFocusPainted(false);
+        btnClose.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnClose.addActionListener(e -> {
+            if (confirm(window, "Apakah Anda yakin ingin keluar?")) System.exit(0);
+        });
+        return btnClose;
+    }
+
+    public static String getLibraryName() {
         try {
             // Ambil dari tabel settings di database
             var result = DB.query("SELECT setting_value FROM settings WHERE setting_key = 'library_name'");
@@ -206,6 +396,62 @@ public class Utils {
             e.printStackTrace();
         }
         return "NAHSAZ LIBRARY"; // Default fallback
+    }
+    public static ImageIcon getAppLogo(int size) {
+        try {
+            BufferedImage img = null;
+            
+            // 1. Try resource (CLASSPATH) - Best for JAR
+            java.net.URL imgURL = Utils.class.getResource("/nahlib/nahsazlibrary.png");
+            if (imgURL != null) {
+                try {
+                    img = ImageIO.read(imgURL);
+                } catch (Exception e) { /* continue */ }
+            } 
+            
+            // 2. Try file system (DEV ENV / FALLBACK)
+            if (img == null) {
+                String[] paths = {
+                    "src/nahlib/nahsazlibrary.png",
+                    "Netbeans/NahLib/src/nahlib/nahsazlibrary.png", 
+                    "nahsazlibrary.png"
+                };
+                
+                for (String p : paths) {
+                    File f = new File(p);
+                    if (f.exists()) {
+                        try {
+                            img = ImageIO.read(f);
+                            if (img != null) break;
+                        } catch (Exception e) { /* continue */ }
+                    }
+                }
+            }
+            
+            // 3. Fallback: Generate a placeholder if still null
+            if (img == null) {
+                img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g = img.createGraphics();
+                g.setColor(ACCENT);
+                g.fillOval(0,0,size,size);
+                g.setColor(Color.WHITE);
+                g.setFont(new Font("Segoe UI", Font.BOLD, size/2));
+                FontMetrics fm = g.getFontMetrics();
+                String text = "N";
+                int x = (size - fm.stringWidth(text)) / 2;
+                int y = ((size - fm.getHeight()) / 2) + fm.getAscent();
+                g.drawString(text, x, y);
+                g.dispose();
+                return new ImageIcon(img);
+            }
+
+            // Use the high-quality makeCircularImage utility we already have
+            return new ImageIcon(makeCircularImage(img, size));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }
 

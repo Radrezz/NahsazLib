@@ -388,13 +388,24 @@ public class LoginPage extends JFrame {
             }
 
             Map<String,String> me = rows.get(0);
+            String role = me.get("role");
+            
+            // Check operational hours for PETUGAS and USER (not ADMIN)
+            if (!"ADMIN".equalsIgnoreCase(role)) {
+                if (!DB.isLibraryOpen()) {
+                    String statusMsg = DB.getLibraryStatusMessage();
+                    Utils.msg("<html><center><b>Perpustakaan Sedang Tutup</b><br><br>" +
+                             statusMsg + "<br><br>" +
+                             "Silakan login saat jam operasional perpustakaan.</center></html>");
+                    return;
+                }
+            }
             
             // Menggunakan DB.audit dari DB.java yang sudah ada
             Long userId = Long.parseLong(me.get("user_id"));
             DB.audit(userId, "LOGIN", "users", me.get("user_id"), "Login sukses");
 
             dispose();
-            String role = me.get("role");
             
             // Navigasi berdasarkan role
             if ("ADMIN".equalsIgnoreCase(role)) {

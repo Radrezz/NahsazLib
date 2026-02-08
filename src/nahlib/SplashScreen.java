@@ -90,7 +90,7 @@ public class SplashScreen extends JFrame {
             
             if (icon != null) {
                 // Pass original image to circular utility with target size
-                logo.setIcon(new ImageIcon(Utils.makeCircularImage(icon.getImage(), 140)));
+                logo.setIcon(new ImageIcon(Utils.makeCircularImage(icon.getImage(), 160)));
             }
         } catch (Exception e) {}
 
@@ -101,7 +101,7 @@ public class SplashScreen extends JFrame {
         title.setAlignmentX(CENTER_ALIGNMENT);
         
         // Subtitle / Version
-        JLabel subtitle = new JLabel("v.2.1 | School Library System");
+        JLabel subtitle = new JLabel("Version 1.0 | School Library System");
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         subtitle.setForeground(new Color(176, 179, 190)); // Soft grey
         subtitle.setAlignmentX(CENTER_ALIGNMENT);

@@ -58,6 +58,7 @@ public class Lang {
         add("btn.print", "Cetak", "Print");
         add("btn.choose", "Pilih", "Choose");
         add("btn.reset", "Reset", "Reset");
+        add("btn.view_detail", "Lihat Detail", "View Detail");
         
         add("msg.confirm_logout", "Apakah Anda yakin ingin logout?", "Are you sure you want to logout?");
         add("msg.confirm_delete", "Apakah Anda yakin ingin menghapus data ini?", "Are you sure you want to delete this data?");
@@ -73,6 +74,9 @@ public class Lang {
         add("msg.success_update", "Data berhasil diperbarui!", "Data updated successfully!");
         add("msg.loading", "Memuat data...", "Loading data...");
         add("msg.no_data", "Tidak ada data", "No data available");
+        add("msg.select_member", "Silakan pilih anggota terlebih dahulu", "Please select a member first");
+        add("msg.select_book", "Silakan pilih buku terlebih dahulu", "Please select a book first");
+        add("msg.invalid_qty", "Jumlah tidak valid", "Invalid quantity");
         
         // === NAVIGATION ===
         add("nav.dashboard", "Dashboard", "Dashboard");
@@ -158,12 +162,15 @@ public class Lang {
         add("books.add_title", "Tambah Buku Baru", "Add New Book");
         add("books.edit_title", "Edit Data Buku", "Edit Book Data");
         add("books.table.id", "ID Buku", "Book ID");
+        add("books.table.isbn", "ISBN", "ISBN");
         add("books.table.title", "Judul Buku", "Book Title");
+        add("books.table.stock", "Stok", "Stock");
+        add("books.table.available", "Tersedia", "Available");
         add("books.table.author", "Pengarang", "Author");
         add("books.table.publisher", "Penerbit", "Publisher");
-        add("books.table.year", "Tahun", "Year");
         add("books.table.category", "Kategori", "Category");
-        add("books.table.stock", "Stok", "Stock");
+        add("books.table.year", "Tahun", "Year");
+        add("books.table.actions", "Aksi", "Actions");
         add("books.table.available", "Tersedia", "Available");
         add("books.form.title", "Judul Buku", "Book Title");
         add("books.form.author", "Pengarang", "Author");
@@ -216,6 +223,15 @@ public class Lang {
         add("report.type.fines", "Laporan Denda", "Fines Report");
         add("report.type.members", "Laporan Anggota", "Members Report");
         add("report.type.books", "Laporan Buku", "Books Report");
+        
+        add("report.card.total", "Total Peminjaman", "Total Loans");
+        add("report.card.active", "Peminjaman Aktif", "Active Loans");
+        add("report.card.overdue", "Terlambat Kembali", "Overdue Returns");
+        add("report.card.returned", "Buku Kembali", "Returned Books");
+        add("report.card.fine", "Total Denda", "Total Fines");
+        
+        add("filter.all_status", "Semua Status", "All Status");
+        add("filter.status", "Status", "Status");
         
         // === LOGIN ===
         add("login.title", "Masuk ke Sistem", "Login to System");
@@ -378,6 +394,30 @@ public class Lang {
         add("label.buka", "BUKA", "OPEN");
         add("label.tutup", "TUTUP", "CLOSED");
         add("btn.save_schedule", "Simpan Jadwal Operasional", "Save Operational Schedule");
+        
+        // === AUDIT / ACTIVITY LOG ===
+        add("report.audit.title", "Log Aktivitas", "Activity Log");
+        add("report.audit.subtitle", "Riwayat aktivitas dan audit sistem", "System activity and audit history");
+        add("report.label.from", "Dari Tanggal", "From Date");
+        add("report.label.to", "Sampai Tanggal", "To Date");
+        add("btn.clear", "Bersihkan", "Clear");
+        
+        // === ADMIN SETTINGS ===
+        add("admin.settings.title", "Pengaturan Sistem", "System Settings");
+        add("admin.settings.subtitle", "Konfigurasi identitas & aturan perpustakaan", "Configure library identity & rules");
+        add("settings.lib_name", "Nama Perpustakaan", "Library Name");
+        add("settings.max_days", "Maks. Lama Pinjam (Hari)", "Max Loan Days");
+        add("settings.max_books", "Maks. Buku per Transaksi", "Max Books per Loan");
+        add("settings.fine", "Denda per Hari (Rp)", "Fine per Day");
+        add("settings.max_borrow", "Maks. Pinjam per User", "Max Loans per User");
+        add("settings.logo", "Logo Aplikasi", "Application Logo");
+        add("settings.btn_change_logo", "Ganti Logo", "Change Logo");
+        add("settings.logo.pick", "Pilih Logo Aplikasi", "Select Application Logo");
+        add("settings.operational", "Jam Operasional", "Operational Hours");
+        add("settings.btn_export", "Export Data (CSV)", "Export Data (CSV)");
+        add("settings.btn_backup", "Backup Database (SQL)", "Backup Database (SQL)");
+        
+        add("day.7", "Minggu", "Sunday");
     }
 
     private static void add(String key, String id, String en) {
