@@ -19,337 +19,373 @@ public class RegisterPage extends JFrame {
     private final JCheckBox showPasswordCheck = new JCheckBox("Show Password");
 
     public RegisterPage() {
-        setTitle(Utils.getLibraryName() + " - Register");
-        setSize(1200, 700);
-        setLocationRelativeTo(null);
+        setUndecorated(true);
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         
-        // Set agar langsung maximize
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
-
         Utils.numericOnly(tfTelp);
 
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(Utils.BG);
-
-        // Container utama
-        JPanel mainContainer = new JPanel(new GridLayout(1, 2, 0, 0));
-        mainContainer.setBackground(Utils.BG);
-
-        // ========== LEFT PANEL: FORM ==========
-        JPanel leftPanel = new JPanel(new BorderLayout());
-        leftPanel.setBackground(Utils.BG);
-        leftPanel.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 30));
-
-        // Gunakan ScrollPane untuk form yang panjang
-        JScrollPane scrollPane = new JScrollPane();
-        scrollPane.setBorder(null);
-        scrollPane.getViewport().setBackground(Utils.BG);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        
-        JPanel contentPanel = new JPanel(new BorderLayout());
-        contentPanel.setBackground(Utils.BG);
-        
-        JPanel card = Utils.card();
-        card.setLayout(new BorderLayout());
-        card.setBorder(BorderFactory.createEmptyBorder(25, 30, 25, 30));
-
-        // Header
-        JPanel headerPanel = new JPanel(new BorderLayout(10, 0));
-        headerPanel.setOpaque(false);
-        headerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
-        
-        JPanel titlePanel = new JPanel();
-        titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
-        titlePanel.setOpaque(false);
-        
-        JLabel h = new JLabel("Daftar Anggota");
-        h.setForeground(Utils.TEXT);
-        h.setFont(new Font("Segoe UI", Font.BOLD, 26));
-        h.setAlignmentX(Component.LEFT_ALIGNMENT);
-        
-        JLabel s = new JLabel("Buat akun baru untuk mengakses layanan perpustakaan");
-        s.setForeground(Utils.MUTED);
-        s.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        s.setAlignmentX(Component.LEFT_ALIGNMENT);
-        
-        titlePanel.add(h);
-        titlePanel.add(Box.createVerticalStrut(6));
-        titlePanel.add(s);
-        
-        headerPanel.add(titlePanel, BorderLayout.CENTER);
-        
-        card.add(headerPanel, BorderLayout.NORTH);
-
-        // Form fields dengan GridLayout 2 kolom
-        JPanel formPanel = new JPanel(new GridBagLayout());
-        formPanel.setOpaque(false);
-        formPanel.setBorder(BorderFactory.createEmptyBorder(5, 0, 15, 0));
-        
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(6, 0, 8, 15);
-        gbc.weightx = 1.0;
-        
-        // Style untuk semua komponen
-        Component[] fields = {tfUsername, tfPass, tfNama, tfKelas, tfTelp, tfEmail};
-        for (Component field : fields) {
-            field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-            if (field instanceof JTextField || field instanceof JPasswordField) {
-                ((JComponent) field).setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(Utils.BORDER, 1),
-                    BorderFactory.createEmptyBorder(8, 10, 8, 10)
-                ));
-                ((JComponent) field).setPreferredSize(new Dimension(0, 38));
-            }
-        }
-        
-        // Password field styling
-        tfPass.setEchoChar('•');
-        
-        // ComboBox styling - hanya Laki-laki dan Perempuan sesuai database
-        cbGender.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        cbGender.setBackground(Utils.CARD2);
-        cbGender.setForeground(Utils.TEXT);
-        cbGender.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Utils.BORDER, 1),
-            BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        ));
-        cbGender.setPreferredSize(new Dimension(0, 38));
-        
-        // TextArea untuk alamat
-        taAlamat.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        taAlamat.setLineWrap(true);
-        taAlamat.setWrapStyleWord(true);
-        taAlamat.setBackground(Utils.CARD2);
-        taAlamat.setForeground(Utils.TEXT);
-        taAlamat.setCaretColor(Utils.TEXT);
-        taAlamat.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Utils.BORDER, 1),
-            BorderFactory.createEmptyBorder(8, 10, 8, 10)
-        ));
-        JScrollPane scrollAlamat = new JScrollPane(taAlamat);
-        scrollAlamat.setBorder(null);
-        scrollAlamat.getViewport().setBackground(Utils.CARD2);
-        scrollAlamat.setPreferredSize(new Dimension(0, 80));
-        
-        // Baris 1: Username dan Password
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1;
-        formPanel.add(createLabel("Username *"), gbc);
-        gbc.gridx = 1;
-        formPanel.add(createLabel("Password *"), gbc);
-        
-        gbc.gridx = 0; gbc.gridy = 1;
-        formPanel.add(tfUsername, gbc);
-        gbc.gridx = 1;
-        formPanel.add(tfPass, gbc);
-        
-        // Show Password Checkbox
-        gbc.gridx = 1; gbc.gridy = 2;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.anchor = GridBagConstraints.WEST;
-        showPasswordCheck.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        showPasswordCheck.setForeground(Utils.MUTED);
-        showPasswordCheck.setBackground(Utils.CARD);
-        showPasswordCheck.setFocusPainted(false);
-        showPasswordCheck.addActionListener(e -> {
-            if (showPasswordCheck.isSelected()) {
-                tfPass.setEchoChar((char) 0);
-            } else {
-                tfPass.setEchoChar('•');
-            }
-        });
-        formPanel.add(showPasswordCheck, gbc);
-        
-        // Reset gbc untuk baris berikutnya
-        gbc.gridx = 0; gbc.gridy = 3;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridwidth = 1;
-        
-        // Baris 4: Nama dan Kelas
-        gbc.gridx = 0; gbc.gridy = 3;
-        formPanel.add(createLabel("Nama Lengkap *"), gbc);
-        gbc.gridx = 1;
-        formPanel.add(createLabel("Kelas"), gbc);
-        
-        gbc.gridx = 0; gbc.gridy = 4;
-        formPanel.add(tfNama, gbc);
-        gbc.gridx = 1;
-        formPanel.add(tfKelas, gbc);
-        
-        // Baris 5: Gender dan Telp
-        gbc.gridx = 0; gbc.gridy = 5;
-        formPanel.add(createLabel("Jenis Kelamin"), gbc);
-        gbc.gridx = 1;
-        formPanel.add(createLabel("No. Telepon"), gbc);
-        
-        gbc.gridx = 0; gbc.gridy = 6;
-        formPanel.add(cbGender, gbc);
-        gbc.gridx = 1;
-        formPanel.add(tfTelp, gbc);
-        
-        // Baris 6: Email (full width)
-        gbc.gridx = 0; gbc.gridy = 7;
-        gbc.gridwidth = 2;
-        formPanel.add(createLabel("Email"), gbc);
-        
-        gbc.gridy = 8;
-        formPanel.add(tfEmail, gbc);
-        
-        // Baris 7: Alamat (full width)
-        gbc.gridy = 9;
-        formPanel.add(createLabel("Alamat"), gbc);
-        
-        gbc.gridy = 10;
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.weighty = 0.5;
-        formPanel.add(scrollAlamat, gbc);
-        
-        card.add(formPanel, BorderLayout.CENTER);
-
-        // Button Panel
-        JPanel bottomPanel = new JPanel();
-        bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
-        bottomPanel.setOpaque(false);
-        bottomPanel.setBorder(BorderFactory.createEmptyBorder(15, 0, 0, 0));
-        
-        // Buttons
-        JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        buttonRow.setOpaque(false);
-        
-        JButton submit = Utils.primaryButton("Daftar Sekarang");
-        submit.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        submit.setPreferredSize(new Dimension(160, 42));
-        
-        JButton back = Utils.ghostButton("← Kembali ke Login");
-        back.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        back.setPreferredSize(new Dimension(160, 42));
-        
-        submit.addActionListener(e -> doRegister());
-        back.addActionListener(e -> { dispose(); new LoginPage(); });
-        
-        buttonRow.add(submit);
-        buttonRow.add(Box.createHorizontalStrut(12));
-        buttonRow.add(back);
-        
-        // Info text
-        JLabel infoLabel = new JLabel("* Menandakan field yang wajib diisi");
-        infoLabel.setFont(new Font("Segoe UI", Font.ITALIC, 9));
-        infoLabel.setForeground(Utils.MUTED);
-        infoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        
-        bottomPanel.add(infoLabel);
-        bottomPanel.add(Box.createVerticalStrut(6));
-        bottomPanel.add(buttonRow);
-        
-        card.add(bottomPanel, BorderLayout.SOUTH);
-        
-        contentPanel.add(card, BorderLayout.CENTER);
-        scrollPane.setViewportView(contentPanel);
-        leftPanel.add(scrollPane, BorderLayout.CENTER);
-
-        // ========== RIGHT PANEL: HERO ==========
-        JPanel rightPanel = new JPanel(new BorderLayout());
-        rightPanel.setBackground(Utils.BG);
-        
-        // Gradient Panel
-        JPanel heroPanel = new JPanel() {
-            @Override 
+        JPanel root = new JPanel(new GridLayout(1, 2, 0, 0)) {
+            @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g;
-                GradientPaint gp = new GradientPaint(
-                    0, 0, Utils.CARD2, 
-                    getWidth(), getHeight(), Utils.BG
-                );
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                GradientPaint gp = new GradientPaint(0, 0, new Color(25, 28, 40), getWidth(), getHeight(), new Color(40, 45, 62));
                 g2.setPaint(gp);
                 g2.fillRect(0, 0, getWidth(), getHeight());
+                
+                g2.setColor(new Color(255, 255, 255, 6));
+                g2.fillOval(-150, -150, 450, 450);
+                g2.fillOval(getWidth()-400, getHeight()-350, 600, 600);
             }
         };
-        heroPanel.setLayout(new BorderLayout());
-        heroPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+
+        // ========== LEFT SIDE: FULL HEIGHT SPLIT ==========
+        JPanel leftSide = new JPanel(new GridBagLayout());
+        leftSide.setOpaque(false);
+        leftSide.setBorder(BorderFactory.createEmptyBorder(0, 30, 0, 15));
+
+        // Glass Card Wrapper
+        JPanel cardWrap = new JPanel(new BorderLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(255, 255, 255, 10));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 30, 30);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        cardWrap.setOpaque(false);
+        cardWrap.setPreferredSize(new Dimension(550, 650));
+
+        JPanel card = new JPanel(new BorderLayout(0, 15));
+        card.setOpaque(false);
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 255, 255, 22), 1),
+            BorderFactory.createEmptyBorder(25, 30, 25, 30)
+        ));
+        cardWrap.add(card);
+
+        // Header
+        JPanel headerPanel = new JPanel();
+        headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
+        headerPanel.setOpaque(false);
         
-        // Logo di atas
-        JLabel bigLogoLabel = new JLabel("", SwingConstants.CENTER);
+        JLabel h = new JLabel("Join Membership");
+        h.setForeground(Color.WHITE);
+        h.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        
+        JLabel s = new JLabel("Complete the form to create your library account");
+        s.setForeground(new Color(176, 179, 190));
+        s.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        
+        headerPanel.add(h);
+        headerPanel.add(Box.createVerticalStrut(4));
+        headerPanel.add(s);
+        
+        card.add(headerPanel, BorderLayout.NORTH);
+
+        // Compact Grid Form
+        JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setOpaque(false);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.5;
+        gbc.insets = new Insets(0, 5, 10, 5);
+
+        // Style all inputs
+        styleField(tfUsername);
+        styleField(tfPass);
+        styleField(tfNama);
+        styleField(tfKelas);
+        styleField(tfTelp);
+        styleField(tfEmail);
+        
+        // Fix background rendering artifacts
+        JTextField[] tfs = {tfUsername, tfNama, tfKelas, tfTelp, tfEmail};
+        for (JTextField f : tfs) f.setOpaque(false);
+        tfPass.setOpaque(false);
+        
+        // Enter Navigation (Chain)
+        tfUsername.addActionListener(e -> tfPass.requestFocus());
+        tfPass.addActionListener(e -> tfNama.requestFocus());
+        tfNama.addActionListener(e -> tfKelas.requestFocus());
+        tfKelas.addActionListener(e -> cbGender.requestFocus());
+        tfTelp.addActionListener(e -> tfEmail.requestFocus());
+        tfEmail.addActionListener(e -> taAlamat.requestFocus());
+        
+        cbGender.setBackground(new Color(255, 255, 255, 10));
+        cbGender.setForeground(Color.WHITE);
+        cbGender.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        cbGender.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 30)));
+        
+        taAlamat.setOpaque(false);
+        taAlamat.setBackground(new Color(255, 255, 255, 14));
+        taAlamat.setForeground(Color.WHITE);
+        taAlamat.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        taAlamat.setCaretColor(Color.WHITE);
+        taAlamat.setLineWrap(true);
+        taAlamat.setWrapStyleWord(true);
+        taAlamat.setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
+        
+        JScrollPane scrollAlamat = new JScrollPane(taAlamat);
+        scrollAlamat.setOpaque(false);
+        scrollAlamat.getViewport().setOpaque(false);
+        scrollAlamat.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 25)));
+        scrollAlamat.setPreferredSize(new Dimension(0, 80)); // Slightly taller for better UX
+
+        // Row 1: Username & Password
+        gbc.gridx = 0; gbc.gridy = 0; formPanel.add(createLabel("USERNAME *"), gbc);
+        gbc.gridx = 1; formPanel.add(createLabel("PASSWORD *"), gbc);
+        gbc.gridx = 0; gbc.gridy = 1; formPanel.add(tfUsername, gbc);
+        gbc.gridx = 1; formPanel.add(tfPass, gbc);
+
+        // Row 2: Show Pass
+        gbc.gridx = 1; gbc.gridy = 2; gbc.insets = new Insets(-5, 5, 5, 5);
+        showPasswordCheck.setOpaque(false);
+        showPasswordCheck.setForeground(new Color(176,179,190));
+        showPasswordCheck.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        showPasswordCheck.addActionListener(e -> tfPass.setEchoChar(showPasswordCheck.isSelected() ? (char)0 : '•'));
+        formPanel.add(showPasswordCheck, gbc);
+
+        // Row 3: Nama & Kelas
+        gbc.insets = new Insets(0, 5, 10, 5);
+        gbc.gridx = 0; gbc.gridy = 3; formPanel.add(createLabel("FULL NAME *"), gbc);
+        gbc.gridx = 1; formPanel.add(createLabel("CLASS"), gbc);
+        gbc.gridx = 0; gbc.gridy = 4; formPanel.add(tfNama, gbc);
+        gbc.gridx = 1; formPanel.add(tfKelas, gbc);
+
+        // Row 4: Gender & Telp
+        gbc.gridx = 0; gbc.gridy = 5; formPanel.add(createLabel("GENDER"), gbc);
+        gbc.gridx = 1; gbc.gridy = 5; formPanel.add(createLabel("PHONE"), gbc);
+        gbc.gridx = 0; gbc.gridy = 6; formPanel.add(cbGender, gbc);
+        gbc.gridx = 1; formPanel.add(tfTelp, gbc);
+
+        // Row 5: Email
+        gbc.gridx = 0; gbc.gridy = 7; gbc.gridwidth = 2; formPanel.add(createLabel("EMAIL ADDRESS"), gbc);
+        gbc.gridy = 8; formPanel.add(tfEmail, gbc);
+
+        // Row 6: Alamat
+        gbc.gridy = 9; formPanel.add(createLabel("ADDRESS"), gbc);
+        gbc.gridy = 10; formPanel.add(scrollAlamat, gbc);
+
+        card.add(formPanel, BorderLayout.CENTER);
+
+        // Footer Actions
+        JPanel footer = new JPanel(new BorderLayout(0, 10));
+        footer.setOpaque(false);
+        
+        JButton btnSubmit = Utils.primaryButton("Create Account");
+        btnSubmit.setPreferredSize(new Dimension(0, 42));
+        btnSubmit.addActionListener(e -> doRegister());
+        
+        JButton btnBack = new JButton("Already have an account? Sign In");
+        btnBack.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btnBack.setForeground(new Color(66, 133, 244));
+        btnBack.setContentAreaFilled(false);
+        btnBack.setBorderPainted(false);
+        btnBack.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnBack.addActionListener(e -> { dispose(); new LoginPage(); });
+        
+        footer.add(btnSubmit, BorderLayout.NORTH);
+        footer.add(btnBack, BorderLayout.SOUTH);
+        
+        card.add(footer, BorderLayout.SOUTH);
+        
+        GridBagConstraints gbcL = new GridBagConstraints();
+        gbcL.gridy = 0; gbcL.weighty = 1.0; gbcL.fill = GridBagConstraints.NONE;
+        gbcL.anchor = GridBagConstraints.CENTER;
+        leftSide.add(cardWrap, gbcL);
+
+        // ========== RIGHT SIDE: FULL HERO INFO ==========
+        JPanel rightSide = new JPanel(new GridBagLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(new Color(255, 255, 255, 3));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        rightSide.setOpaque(false);
+        rightSide.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 20)); // Minimal top-right corner gap
+
+        // Red Circular Exit Button
+        JButton btnClose = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Red Circle Background
+                g2.setColor(getModel().isRollover() ? new Color(255, 80, 80) : new Color(220, 50, 50));
+                g2.fillOval(2, 2, getWidth()-4, getHeight()-4);
+                
+                // White X
+                g2.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.setColor(Color.WHITE);
+                int p = 10;
+                int sz = getWidth() - (p * 2);
+                g2.drawLine(p, p, p + sz, p + sz);
+                g2.drawLine(p + sz, p, p, p + sz);
+                
+                g2.dispose();
+            }
+        };
+        btnClose.setPreferredSize(new Dimension(34, 34));
+        btnClose.setContentAreaFilled(false);
+        btnClose.setBorderPainted(false);
+        btnClose.setFocusPainted(false);
+        btnClose.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnClose.addActionListener(e -> {
+            if (Utils.confirm(this, "Apakah Anda yakin ingin keluar?")) System.exit(0);
+        });
+        
+        // Absolute corner placement
+        JPanel closePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        closePanel.setOpaque(false);
+        closePanel.add(btnClose);
+
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+        infoPanel.setOpaque(false);
+        
+        JLabel logo = new JLabel();
         try {
-            URL imageURL = getClass().getResource("/nahlib/nahsazlibrary.png");
-            if (imageURL != null) {
-                ImageIcon largeLogoIcon = new ImageIcon(imageURL);
-                Image largeScaledImage = largeLogoIcon.getImage().getScaledInstance(180, 180, Image.SCALE_SMOOTH);
-                ImageIcon largeLogo = new ImageIcon(largeScaledImage);
-                bigLogoLabel.setIcon(largeLogo);
+            java.io.File f = new java.io.File("src/nahlib/nahsazlibrary.png");
+            Image img = null;
+            if (f.exists()) {
+                ImageIcon ic = new ImageIcon(f.getAbsolutePath());
+                ic.getImage().flush(); // Clear Java's image cache
+                img = ic.getImage();
+            } else {
+                java.net.URL url = getClass().getResource("/nahlib/nahsazlibrary.png");
+                if (url != null) img = new ImageIcon(url).getImage();
             }
-        } catch (Exception e) {
-            // Fallback jika logo tidak ditemukan
-            bigLogoLabel.setText("📚");
-            bigLogoLabel.setFont(new Font("Segoe UI", Font.BOLD, 50));
-            bigLogoLabel.setForeground(Utils.TEXT);
-        }
-        bigLogoLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 25, 0));
+            if (img != null) {
+                logo.setIcon(new ImageIcon(Utils.makeCircularImage(img, 240)));
+            }
+        } catch (Exception e) {}
+        logo.setAlignmentX(CENTER_ALIGNMENT);
         
-        // Content panel
-        JPanel contentPanelRight = new JPanel();
-        contentPanelRight.setLayout(new BoxLayout(contentPanelRight, BoxLayout.Y_AXIS));
-        contentPanelRight.setOpaque(false);
+        JLabel brand = new JLabel("Start Your Journey");
+        brand.setFont(new Font("Segoe UI", Font.BOLD, 48));
+        brand.setForeground(Color.WHITE);
+        brand.setAlignmentX(CENTER_ALIGNMENT);
         
-        // Title
-        JLabel heroTitle = new JLabel("Bergabung dengan Komunitas Membaca");
-        heroTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
-        heroTitle.setForeground(Utils.TEXT);
-        heroTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JLabel sub = new JLabel("<html><center>Unlock thousands of books and resources.<br><font color='#A8B0B8'>Bergabung dengan komunitas kami hari ini.</font></center></html>");
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        sub.setForeground(new Color(176, 179, 190));
+        sub.setAlignmentX(CENTER_ALIGNMENT);
+        sub.setHorizontalAlignment(SwingConstants.CENTER);
+        sub.setMaximumSize(new Dimension(800, 60));
         
-        JLabel heroSub = new JLabel("Dengan menjadi anggota, Anda mendapatkan akses ke:");
-        heroSub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        heroSub.setForeground(Utils.MUTED);
-        heroSub.setAlignmentX(Component.CENTER_ALIGNMENT);
-        
-        // Features list
-        JPanel featuresPanel = new JPanel();
-        featuresPanel.setLayout(new BoxLayout(featuresPanel, BoxLayout.Y_AXIS));
-        featuresPanel.setOpaque(false);
-        featuresPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        featuresPanel.setBorder(BorderFactory.createEmptyBorder(15, 0, 0, 0));
-        
-        String[] features = {
-            "Koleksi buku terlengkap",
-            "Sistem peminjaman online",
-            "Notifikasi dan pengingat",
-            "Riwayat baca pribadi"
+        infoPanel.add(logo);
+        infoPanel.add(Box.createVerticalStrut(30));
+        infoPanel.add(brand);
+        infoPanel.add(Box.createVerticalStrut(15));
+        infoPanel.add(sub);
+        infoPanel.add(Box.createVerticalStrut(60));
+
+        // Real Benefits Descriptions
+        String[][] benefits = {
+            {"Katalog Terpadu", "Akses ribuan data buku fisik dalam satu platform manajemen."},
+            {"Manajemen Efisien", "Proses sirkulasi buku yang termonitor dengan baik untuk tiap anggota."},
+            {"Sistem Notifikasi", "Membantu petugas memantau keterlambatan pengembalian buku."}
         };
-        
-        for (String feature : features) {
-            JLabel featureLabel = new JLabel(feature);
-            featureLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-            featureLabel.setForeground(Utils.MUTED);
-            featureLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-            featureLabel.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
-            featuresPanel.add(featureLabel);
+
+        for (String[] b : benefits) {
+            JPanel fBox = new JPanel(new BorderLayout(20, 0));
+            fBox.setOpaque(false);
+            fBox.setMaximumSize(new Dimension(500, 85));
+            fBox.setAlignmentX(CENTER_ALIGNMENT);
+            
+            JLabel dot = new JLabel("●");
+            dot.setForeground(new Color(66, 133, 244));
+            dot.setFont(new Font("Arial", Font.BOLD, 20));
+            dot.setVerticalAlignment(SwingConstants.TOP);
+            
+            JPanel fTxt = new JPanel();
+            fTxt.setLayout(new BoxLayout(fTxt, BoxLayout.Y_AXIS));
+            fTxt.setOpaque(false);
+            
+            JLabel fTitle = new JLabel(b[0]);
+            fTitle.setForeground(Color.WHITE);
+            fTitle.setFont(new Font("Segoe UI", Font.BOLD, 17));
+            
+            JLabel fDesc = new JLabel("<html><div style='width: 360px; line-height: 1.3;'>" + b[1] + "</div></html>");
+            fDesc.setForeground(new Color(176, 179, 190));
+            fDesc.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            
+            fTxt.add(fTitle);
+            fTxt.add(Box.createVerticalStrut(5));
+            fTxt.add(fDesc);
+            
+            fBox.add(dot, BorderLayout.WEST);
+            fBox.add(fTxt, BorderLayout.CENTER);
+            fBox.setBorder(BorderFactory.createEmptyBorder(0, 0, 25, 0));
+            
+            infoPanel.add(fBox);
         }
-
-        contentPanelRight.add(heroTitle);
-        contentPanelRight.add(Box.createVerticalStrut(10));
-        contentPanelRight.add(heroSub);
-        contentPanelRight.add(Box.createVerticalStrut(15));
-        contentPanelRight.add(featuresPanel);
         
-        heroPanel.add(bigLogoLabel, BorderLayout.NORTH);
-        heroPanel.add(contentPanelRight, BorderLayout.CENTER);
+        GridBagConstraints gbcR = new GridBagConstraints();
+        gbcR.gridx = 0; gbcR.gridy = 0; gbcR.weightx = 1.0; gbcR.weighty = 0.0;
+        gbcR.anchor = GridBagConstraints.NORTHEAST;
+        rightSide.add(closePanel, gbcR);
 
-        rightPanel.add(heroPanel, BorderLayout.CENTER);
+        gbcR.gridy = 1; gbcR.weighty = 1.0; gbcR.anchor = GridBagConstraints.CENTER;
+        rightSide.add(infoPanel, gbcR);
 
-        mainContainer.add(leftPanel);
-        mainContainer.add(rightPanel);
-
-        root.add(mainContainer, BorderLayout.CENTER);
+        root.add(leftSide);
+        root.add(rightSide);
 
         setContentPane(root);
         setVisible(true);
     }
 
+    private void styleField(JTextField f) {
+        f.setOpaque(false); 
+        f.setBackground(new Color(255, 255, 255, 14));
+        f.setForeground(Color.WHITE);
+        f.setCaretColor(Color.WHITE);
+        f.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        f.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 255, 255, 25), 1),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+        f.setPreferredSize(new Dimension(0, 35));
+        
+        if (f instanceof JPasswordField) {
+            f.setUI(new javax.swing.plaf.basic.BasicPasswordFieldUI() {
+                @Override
+                protected void paintBackground(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g;
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(f.getBackground());
+                    g2.fillRoundRect(0, 0, f.getWidth(), f.getHeight(), 5, 5);
+                }
+            });
+        } else {
+            f.setUI(new javax.swing.plaf.basic.BasicTextFieldUI() {
+                @Override
+                protected void paintBackground(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g;
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(f.getBackground());
+                    g2.fillRoundRect(0, 0, f.getWidth(), f.getHeight(), 5, 5);
+                }
+            });
+        }
+    }
+
     private JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        label.setForeground(Utils.MUTED);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        label.setForeground(new Color(255, 255, 255, 130));
         return label;
     }
 

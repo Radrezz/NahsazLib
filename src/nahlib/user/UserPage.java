@@ -1,8 +1,11 @@
 package nahlib.user;
 
+import nahlib.Lang;
 import nahlib.DB;
 import nahlib.LoginPage;
 import nahlib.Utils;
+import nahlib.CustomIcon;
+import nahlib.SimpleChart;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -19,11 +22,13 @@ public class UserPage extends JFrame {
     private final CardLayout cards = new CardLayout();
     private final JPanel content = new JPanel(cards);
     private final Map<String, JPanel> panels = new HashMap<>();
+    private JLabel appLogo;
+    private JLabel appTitle;
 
     public UserPage(Map<String,String> me) {
         this.me = me;
 
-        setTitle(Utils.getLibraryName() + " - Anggota Dashboard");
+        setTitle(Utils.getLibraryName() + " - " + Lang.get("user.dash.title"));
         setSize(1280, 780);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -41,21 +46,25 @@ public class UserPage extends JFrame {
         ));
 
         // Left side: Logo + Title
-        JPanel leftTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        JPanel leftTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         leftTop.setOpaque(false);
         
-        JLabel title = new JLabel(Utils.getLibraryName());
-        title.setForeground(Utils.ACCENT);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        appLogo = new JLabel();
+        updateLogo();
         
-        JLabel subtitle = new JLabel(" • Anggota Dashboard");
+        appTitle = new JLabel(Utils.getLibraryName());
+        appTitle.setForeground(Utils.ACCENT);
+        appTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        
+        JLabel subtitle = new JLabel(" • " + Lang.get("user.dash.title"));
         subtitle.setForeground(Utils.TEXT);
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         
-        leftTop.add(title);
+        leftTop.add(appLogo);
+        leftTop.add(appTitle);
         leftTop.add(subtitle);
 
-        // Right side: User info + Logout
+        // Right side: User info + Logout + Refresh
         JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rightTop.setOpaque(false);
         
@@ -66,18 +75,18 @@ public class UserPage extends JFrame {
             new EmptyBorder(6, 12, 6, 12)
         ));
         
-        JLabel userIcon = new JLabel("👤");
-        userIcon.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        // User icon using Graphics2D
+        JLabel userIcon = new JLabel(new CustomIcon(CustomIcon.Type.USERS, 20, new Color(66, 133, 244)));
         
         JLabel who = new JLabel(me.get("nama_lengkap"));
         who.setForeground(Utils.TEXT);
         who.setFont(Utils.FONT_B);
         
-        JLabel kelas = new JLabel("Kelas: " + me.get("kelas"));
+        JLabel kelas = new JLabel(Lang.get("label.kelas") + ": " + me.get("kelas"));
         kelas.setForeground(Utils.MUTED);
         kelas.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         
-        JLabel role = new JLabel("ANGGOTA");
+        JLabel role = new JLabel(Lang.get("role.user"));
         role.setForeground(new Color(66, 133, 244));
         role.setFont(new Font("Segoe UI", Font.BOLD, 10));
         role.setBorder(BorderFactory.createCompoundBorder(
@@ -90,7 +99,41 @@ public class UserPage extends JFrame {
         userCard.add(role);
         userCard.add(kelas);
         
-        JButton logout = new JButton("Logout");
+        JButton refreshBtn = new JButton(Lang.get("btn.refresh"));
+        refreshBtn.setFont(Utils.FONT);
+        refreshBtn.setForeground(Utils.TEXT);
+        refreshBtn.setBackground(Utils.CARD);
+        refreshBtn.setBorder(BorderFactory.createCompoundBorder(
+             BorderFactory.createLineBorder(Utils.BORDER),
+             new EmptyBorder(8, 12, 8, 12)
+        ));
+        refreshBtn.setFocusPainted(false);
+        refreshBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        refreshBtn.addActionListener(e -> refreshApp());
+        
+        // Language Switcher Button
+        String currentLangText = Lang.getLanguage() == 0 ? "ID" : "EN";
+        JButton langBtn = new JButton(currentLangText, new CustomIcon(CustomIcon.Type.GLOBE, 16, Utils.TEXT));
+        langBtn.setHorizontalTextPosition(SwingConstants.RIGHT);
+        langBtn.setIconTextGap(8);
+        langBtn.setFont(Utils.FONT_B);
+        langBtn.setForeground(Utils.TEXT);
+        langBtn.setBackground(Utils.CARD);
+        langBtn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Utils.BORDER),
+            new EmptyBorder(8, 12, 8, 12)
+        ));
+        langBtn.setFocusPainted(false);
+        langBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        langBtn.setToolTipText(Lang.getLanguage() == 0 ? "Switch to English" : "Ganti ke Bahasa Indonesia");
+        langBtn.addActionListener(e -> {
+            int newLang = Lang.getLanguage() == 0 ? 1 : 0;
+            Lang.setLanguage(newLang);
+            dispose();
+            new UserPage(me).setVisible(true);
+        });
+        
+        JButton logout = new JButton(Lang.get("btn.logout"));
         logout.setFont(Utils.FONT_B);
         logout.setForeground(Utils.TEXT);
         logout.setBackground(Utils.CARD);
@@ -101,22 +144,28 @@ public class UserPage extends JFrame {
         logout.setFocusPainted(false);
         logout.setCursor(new Cursor(Cursor.HAND_CURSOR));
         logout.addActionListener(e -> {
-            if (confirmDialog("Keluar", "Apakah Anda yakin ingin logout?")) {
-                DB.audit(id(), "LOGOUT", "users", me.get("user_id"), "Logout");
+            // Fix method id() not found - use me.get("user_id")
+            if (confirmDialog(Lang.get("btn.logout"), Lang.get("msg.confirm_logout"))) {
+                DB.audit(Long.parseLong(me.get("user_id")), "LOGOUT", "users", me.get("user_id"), "Logout");
                 dispose();
                 new LoginPage();
             }
         });
         
-        logout.addMouseListener(new java.awt.event.MouseAdapter() {
+        java.awt.event.MouseAdapter hover = new java.awt.event.MouseAdapter() {
             public void mouseEntered(java.awt.event.MouseEvent evt) {
-                logout.setBackground(Utils.CARD2);
+                ((JButton)evt.getSource()).setBackground(Utils.CARD2);
             }
             public void mouseExited(java.awt.event.MouseEvent evt) {
-                logout.setBackground(Utils.CARD);
+                ((JButton)evt.getSource()).setBackground(Utils.CARD);
             }
-        });
+        };
+        logout.addMouseListener(hover);
+        refreshBtn.addMouseListener(hover);
+        langBtn.addMouseListener(hover);
 
+        rightTop.add(refreshBtn);
+        rightTop.add(langBtn);
         rightTop.add(userCard);
         rightTop.add(logout);
 
@@ -146,8 +195,19 @@ public class UserPage extends JFrame {
 
         // =========== BOTTOM NAVIGATION ===========
         String[] labels = new String[]{
-            "Dashboard", "Browse Books", "Wishlist", 
-            "Riwayat", "Notifikasi"
+            Lang.get("nav.dashboard"), 
+            Lang.get("nav.browse"), 
+            Lang.get("nav.wishlist"), 
+            Lang.get("nav.history"), 
+            Lang.get("nav.notifications")
+        };
+        
+        CustomIcon.Type[] icons = new CustomIcon.Type[]{
+            CustomIcon.Type.DASHBOARD,
+            CustomIcon.Type.SEARCH,
+            CustomIcon.Type.BOOKS,
+            CustomIcon.Type.REPORTS,
+            CustomIcon.Type.AUDIT
         };
         
         Runnable[] actions = new Runnable[]{
@@ -158,7 +218,7 @@ public class UserPage extends JFrame {
             () -> { notif.refresh(); showPanel("notif", 4); }
         };
         
-        JPanel nav = createBottomNav(labels, actions, 0);
+        JPanel nav = createBottomNav(labels, icons, actions, 0);
 
         // =========== ASSEMBLE ROOT ===========
         root.add(top, BorderLayout.NORTH);
@@ -168,6 +228,35 @@ public class UserPage extends JFrame {
         setContentPane(root);
         dash.refresh();
         setVisible(true);
+    }
+    
+    private void refreshApp() {
+        updateLogo();
+        appTitle.setText(Utils.getLibraryName());
+        for (JPanel p : panels.values()) {
+            if (p.isVisible()) {
+                try {
+                    p.getClass().getMethod("refresh").invoke(p);
+                } catch (Exception e) {}
+            }
+        }
+    }
+    
+    private void updateLogo() {
+        try {
+            java.io.File f = new java.io.File("src/nahlib/nahsazlibrary.png");
+            if (f.exists()) {
+                ImageIcon ic = new ImageIcon(f.getAbsolutePath());
+                ic.getImage().flush();
+                appLogo.setIcon(new ImageIcon(Utils.makeCircularImage(ic.getImage(), 32)));
+            } else {
+                java.net.URL imgURL = getClass().getResource("/nahlib/nahsazlibrary.png");
+                if (imgURL != null) {
+                    ImageIcon ic = new ImageIcon(imgURL);
+                    appLogo.setIcon(new ImageIcon(Utils.makeCircularImage(ic.getImage(), 32)));
+                }
+            }
+        } catch (Exception e) {}
     }
 
     private long id() { 
@@ -184,13 +273,13 @@ public class UserPage extends JFrame {
         }
     }
     
-    private JPanel createBottomNav(String[] labels, Runnable[] actions, int activeIndex) {
+    private JPanel createBottomNav(String[] labels, CustomIcon.Type[] icons, Runnable[] actions, int activeIndex) {
         JPanel bar = new JPanel(new GridLayout(1, labels.length, 1, 0));
         bar.setBackground(Utils.BG);
         bar.setBorder(new EmptyBorder(0, 0, 0, 0));
         
         for (int i = 0; i < labels.length; i++) {
-            JButton btn = createNavButton(labels[i], i == activeIndex);
+            JButton btn = createNavButton(labels[i], icons[i], i == activeIndex);
             final int idx = i;
             btn.addActionListener(e -> {
                 actions[idx].run();
@@ -200,8 +289,9 @@ public class UserPage extends JFrame {
         return bar;
     }
     
-    private JButton createNavButton(String text, boolean active) {
+    private JButton createNavButton(String text, CustomIcon.Type iconType, boolean active) {
         JButton btn = new JButton(text);
+        btn.putClientProperty("iconType", iconType);
         btn.setFont(Utils.FONT);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
@@ -209,6 +299,27 @@ public class UserPage extends JFrame {
         btn.setOpaque(true);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
+        applyButtonStyle(btn, active);
+        
+        if (!active) {
+            btn.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    if (btn.getBackground() != Utils.ACCENT) {
+                        btn.setBackground(Utils.CARD2);
+                    }
+                }
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    if (btn.getBackground() != Utils.ACCENT) {
+                        btn.setBackground(Utils.CARD);
+                    }
+                }
+            });
+        }
+        
+        return btn;
+    }
+
+    private void applyButtonStyle(JButton btn, boolean active) {
         if (active) {
             btn.setBackground(Utils.ACCENT);
             btn.setForeground(Color.WHITE);
@@ -220,36 +331,35 @@ public class UserPage extends JFrame {
                 BorderFactory.createMatteBorder(1, 0, 0, 1, Utils.BORDER),
                 new EmptyBorder(14, 0, 14, 0)
             ));
-            
-            btn.addMouseListener(new java.awt.event.MouseAdapter() {
-                public void mouseEntered(java.awt.event.MouseEvent evt) {
-                    btn.setBackground(Utils.CARD2);
-                }
-                public void mouseExited(java.awt.event.MouseEvent evt) {
-                    btn.setBackground(Utils.CARD);
-                }
-            });
         }
         
-        return btn;
+        CustomIcon.Type icType = (CustomIcon.Type) btn.getClientProperty("iconType");
+        if (icType == null) icType = CustomIcon.Type.DASHBOARD;
+        btn.setIcon(new CustomIcon(icType, 18, active ? Color.WHITE : Utils.MUTED));
     }
     
     private void updateNavHighlight(int activeIndex) {
         JPanel root = (JPanel) getContentPane();
-        
-        // Cari panel navigasi (posisi BorderLayout.SOUTH = 2)
-        Component southComponent = null;
         BorderLayout layout = (BorderLayout) root.getLayout();
-        if (layout != null) {
-            southComponent = layout.getLayoutComponent(BorderLayout.SOUTH);
-        }
+        Component southComponent = layout.getLayoutComponent(BorderLayout.SOUTH);
         
         if (southComponent != null) {
             root.remove(southComponent);
             
             String[] labels = new String[]{
-                "Dashboard", "Browse Books", "Wishlist", 
-                "Riwayat", "Notifikasi"
+                Lang.get("nav.dashboard"), 
+                Lang.get("nav.browse"), 
+                Lang.get("nav.wishlist"), 
+                Lang.get("nav.history"), 
+                Lang.get("nav.notifications")
+            };
+            
+            CustomIcon.Type[] icons = new CustomIcon.Type[]{
+                CustomIcon.Type.DASHBOARD,
+                CustomIcon.Type.SEARCH,
+                CustomIcon.Type.BOOKS,
+                CustomIcon.Type.REPORTS,
+                CustomIcon.Type.AUDIT
             };
             
             Runnable[] actions = new Runnable[]{
@@ -260,7 +370,7 @@ public class UserPage extends JFrame {
                 () -> { ((NotifPanel)panels.get("notif")).refresh(); showPanel("notif", 4); }
             };
             
-            JPanel newNav = createBottomNav(labels, actions, activeIndex);
+            JPanel newNav = createBottomNav(labels, icons, actions, activeIndex);
             root.add(newNav, BorderLayout.SOUTH);
             root.revalidate();
             root.repaint();
@@ -268,15 +378,15 @@ public class UserPage extends JFrame {
     }
     
     private void updateNavBadge(int index, int count) {
-        if (count <= 0) return;
-        
         JPanel root = (JPanel) getContentPane();
         BorderLayout layout = (BorderLayout) root.getLayout();
         JPanel nav = (JPanel) layout.getLayoutComponent(BorderLayout.SOUTH);
         
         if (nav != null && nav.getComponent(index) instanceof JButton) {
             JButton notifBtn = (JButton) nav.getComponent(index);
-            notifBtn.setText("Notifikasi (" + count + ")");
+            String text = Lang.get("nav.notifications");
+            if (count > 0) text += " (" + count + ")";
+            notifBtn.setText(text);
         }
     }
     
@@ -336,21 +446,25 @@ public class UserPage extends JFrame {
         private final JLabel dueSoon = createStatLabel("0");
         private final JLabel overdue = createStatLabel("0");
         private final JLabel wishlist = createStatLabel("0");
+        
+        private SimpleChart barChart;
+        private SimpleChart lineChart;
 
         DashboardPanel() {
             setBackground(Utils.BG);
-            setLayout(new BorderLayout());
+            setLayout(new GridBagLayout()); // Bento Layout
             
             // Header
             JPanel header = new JPanel(new BorderLayout());
             header.setBackground(Utils.BG);
-            header.setBorder(new EmptyBorder(20, 20, 20, 20));
+            header.setBorder(new EmptyBorder(20, 30, 10, 30));
             
-            JLabel title = new JLabel("Dashboard Anggota");
+            JLabel title = new JLabel(Lang.get("user.dash.title"), new CustomIcon(CustomIcon.Type.DASHBOARD, 24, new Color(66, 133, 244)), SwingConstants.LEFT);
             title.setForeground(Utils.TEXT);
-            title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+            title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+            title.setIconTextGap(12);
             
-            JLabel subtitle = new JLabel("Selamat datang, " + me.get("nama_lengkap") + "! Status peminjaman Anda:");
+            JLabel subtitle = new JLabel(String.format(Lang.get("user.dash.subtitle"), me.get("nama_lengkap")));
             subtitle.setForeground(Utils.MUTED);
             subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
             
@@ -360,28 +474,67 @@ public class UserPage extends JFrame {
             titlePanel.add(subtitle, BorderLayout.SOUTH);
             
             header.add(titlePanel, BorderLayout.WEST);
-            add(header, BorderLayout.NORTH);
+            
+            addGB(header, 0, 0, 3, 1, 1.0, 0.0);
 
-            // Stats Grid
-            JPanel grid = new JPanel(new GridLayout(2, 2, 16, 16));
-            grid.setBackground(Utils.BG);
-            grid.setBorder(new EmptyBorder(0, 20, 20, 20));
+            // === BENTO GRID CONTENT ===
+            // Quick Actions (Right Side - Tall - Spans 2 Rows)
+            addGB(createQuickActionsPanel(), 2, 1, 1, 2, 0.3, 0.5);
+
+            // Stats Grid (Left Side - 2x2)
+            addGB(createStatCard(Lang.get("user.stat.borrowed"), borrowed, new Color(66, 133, 244)), 0, 1, 1, 1, 0.35, 0.25);
+            addGB(createStatCard(Lang.get("user.stat.duesoon"), dueSoon, new Color(251, 188, 5)), 1, 1, 1, 1, 0.35, 0.25);
+            addGB(createStatCard(Lang.get("user.stat.overdue"), overdue, new Color(234, 67, 53)), 0, 2, 1, 1, 0.35, 0.25);
+            addGB(createStatCard(Lang.get("user.stat.wishlist"), wishlist, new Color(52, 168, 83)), 1, 2, 1, 1, 0.35, 0.25);
+
+            // Charts
+            barChart = new SimpleChart(SimpleChart.Type.BAR, new Color(66, 133, 244));
+            lineChart = new SimpleChart(SimpleChart.Type.LINE, new Color(52, 168, 83));
             
-            grid.add(createStatCard("Sedang Dipinjam", borrowed, new Color(66, 133, 244)));
-            grid.add(createStatCard("Jatuh Tempo (≤1 hari)", dueSoon, new Color(66, 133, 244)));
-            grid.add(createStatCard("Terlambat", overdue, new Color(251, 188, 5)));
-            grid.add(createStatCard("Wishlist", wishlist, new Color(251, 188, 5)));
-            
-            add(grid, BorderLayout.CENTER);
-            
-            // Quick Actions Panel
-            add(createQuickActionsPanel(), BorderLayout.SOUTH);
+            JPanel barWrapper = Utils.card();
+            barWrapper.setLayout(new BorderLayout());
+            JLabel barLabel = new JLabel(Lang.get("user.chart.loan"));
+            barLabel.setForeground(Utils.TEXT);
+            barLabel.setFont(Utils.FONT_B);
+            barLabel.setBorder(new EmptyBorder(0,0,10,0));
+            barWrapper.add(barLabel, BorderLayout.NORTH);
+            barWrapper.add(barChart, BorderLayout.CENTER);
+
+            JPanel lineWrapper = Utils.card();
+            lineWrapper.setLayout(new BorderLayout());
+            JLabel lineLabel = new JLabel(Lang.get("user.chart.read"));
+            lineLabel.setForeground(Utils.TEXT);
+            lineLabel.setFont(Utils.FONT_B);
+            lineLabel.setBorder(new EmptyBorder(0,0,10,0));
+            lineWrapper.add(lineLabel, BorderLayout.NORTH);
+            lineWrapper.add(lineChart, BorderLayout.CENTER);
+
+            // Side-by-side charts at bottom, full width
+            addGB(barWrapper, 0, 3, 1, 1, 0.5, 0.4);
+            addGB(lineWrapper, 1, 3, 2, 1, 0.5, 0.4);
+        }
+        
+        // Helper
+        private void addGB(Component comp, int x, int y, int w, int h, double wx, double wy) {
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = x;
+            gbc.gridy = y;
+            gbc.gridwidth = w;
+            gbc.gridheight = h;
+            gbc.weightx = wx;
+            gbc.weighty = wy;
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.insets = new Insets(8, 8, 8, 8);
+            if (x == 0) gbc.insets.left = 30;
+            if (x + w == 3) gbc.insets.right = 30; // Assuming 3 cols
+            if (y == 3) gbc.insets.bottom = 30;
+            add(comp, gbc);
         }
         
         private JLabel createStatLabel(String text) {
-            JLabel label = new JLabel(text, SwingConstants.CENTER);
+            JLabel label = new JLabel(text, SwingConstants.LEFT);
             label.setForeground(Utils.TEXT);
-            label.setFont(new Font("Segoe UI", Font.BOLD, 36));
+            label.setFont(new Font("Segoe UI", Font.BOLD, 32));
             return label;
         }
         
@@ -389,45 +542,49 @@ public class UserPage extends JFrame {
             JPanel card = new JPanel(new BorderLayout());
             card.setBackground(Utils.CARD);
             card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Utils.BORDER),
+                BorderFactory.createMatteBorder(0, 0, 0, 0, Utils.BORDER), 
                 new EmptyBorder(20, 20, 20, 20)
             ));
             
-            JPanel accentBar = new JPanel();
-            accentBar.setBackground(accentColor);
-            accentBar.setPreferredSize(new Dimension(card.getWidth(), 4));
-            card.add(accentBar, BorderLayout.NORTH);
-            
-            JPanel content = new JPanel(new BorderLayout(0, 10));
-            content.setOpaque(false);
-            content.add(value, BorderLayout.CENTER);
-            
-            JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
+            JPanel headerObj = new JPanel(new BorderLayout());
+            headerObj.setOpaque(false);
+            JLabel titleLabel = new JLabel(title.toUpperCase());
             titleLabel.setForeground(Utils.MUTED);
-            titleLabel.setFont(Utils.FONT);
-            content.add(titleLabel, BorderLayout.SOUTH);
+            titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            titleLabel.setBorder(new EmptyBorder(0, 0, 5, 0));
+            headerObj.add(titleLabel, BorderLayout.CENTER);
             
-            card.add(content, BorderLayout.CENTER);
+            card.add(headerObj, BorderLayout.NORTH);
+            card.add(value, BorderLayout.CENTER);
+            
+            JPanel bottomBar = new JPanel();
+            bottomBar.setBackground(accentColor);
+            bottomBar.setPreferredSize(new Dimension(0, 3));
+            card.add(bottomBar, BorderLayout.SOUTH);
+            
             return card;
         }
         
         private JPanel createQuickActionsPanel() {
             JPanel panel = new JPanel(new BorderLayout());
-            panel.setBackground(Utils.BG);
-            panel.setBorder(new EmptyBorder(0, 20, 20, 20));
+            panel.setBackground(Utils.CARD);
+            panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 0, 0, Utils.BORDER), 
+                new EmptyBorder(20, 20, 20, 20)
+            ));
             
-            JLabel title = new JLabel("Aksi Cepat");
-            title.setForeground(Utils.TEXT);
-            title.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            title.setBorder(new EmptyBorder(0, 0, 10, 0));
+            JLabel title = new JLabel(Lang.get("user.quickaction.title"));
+            title.setForeground(Utils.MUTED);
+            title.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            title.setBorder(new EmptyBorder(0, 0, 15, 0));
             
-            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
-            actions.setBackground(Utils.BG);
+            JPanel actions = new JPanel(new GridLayout(4, 1, 0, 10));
+            actions.setBackground(Utils.CARD);
             
-            JButton browseBtn = createSecondaryButton("Browse Books");
-            JButton wishlistBtn = createSecondaryButton("Lihat Wishlist");
-            JButton historyBtn = createSecondaryButton("Lihat Riwayat");
-            JButton notificationBtn = createSecondaryButton("Cek Notifikasi");
+            JButton browseBtn = createActionButton(Lang.get("user.quickaction.browse"), CustomIcon.Type.SEARCH);
+            JButton wishlistBtn = createActionButton(Lang.get("user.quickaction.wishlist"), CustomIcon.Type.BOOKS);
+            JButton historyBtn = createActionButton(Lang.get("user.quickaction.history"), CustomIcon.Type.REPORTS);
+            JButton notificationBtn = createActionButton(Lang.get("user.quickaction.notification"), CustomIcon.Type.AUDIT);
             
             browseBtn.addActionListener(e -> {
                 ((BrowsePanel)panels.get("browse")).refresh();
@@ -458,6 +615,29 @@ public class UserPage extends JFrame {
             panel.add(actions, BorderLayout.CENTER);
             
             return panel;
+        }
+        
+        private JButton createActionButton(String text, CustomIcon.Type iconType) {
+            JButton btn = new JButton(text, new CustomIcon(iconType, 16, Utils.ACCENT));
+            btn.setFont(Utils.FONT);
+            btn.setForeground(Utils.TEXT);
+            btn.setBackground(Utils.BG);
+            btn.setHorizontalAlignment(SwingConstants.LEFT);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Utils.BORDER),
+                new EmptyBorder(10, 15, 10, 15)
+            ));
+            btn.setFocusPainted(false);
+            btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            btn.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    btn.setBackground(Utils.CARD2);
+                }
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    btn.setBackground(Utils.BG);
+                }
+            });
+            return btn;
         }
 
         void refresh() {
@@ -493,12 +673,21 @@ public class UserPage extends JFrame {
                 overdue.setText(String.valueOf(o));
                 wishlist.setText(String.valueOf(w));
 
+                // Populate charts
+                List<String> months;
+                if (Lang.getLanguage() == 0) {
+                    months = List.of("Jan", "Feb", "Mar", "Apr", "Mei", "Jun");
+                } else {
+                    months = List.of("Jan", "Feb", "Mar", "Apr", "May", "Jun");
+                }
+                List<Double> readData = List.of(2.0, 5.0, 3.0, 7.0, 4.0, 8.0);
+                List<Double> activityData = List.of(10.0, 15.0, 25.0, 20.0, 30.0, 45.0);
+                
+                barChart.setData(months, readData);
+                lineChart.setData(months, activityData);
+
                 if (d > 0 || o > 0) {
-                    showMessageDialog("Peringatan", 
-                        "Ada " + (d + o) + " buku yang perlu perhatian:\n" +
-                        "• " + d + " buku akan jatuh tempo dalam 1 hari\n" +
-                        "• " + o + " buku sudah terlambat\n\n" +
-                        "Silakan cek menu Notifikasi untuk detail lebih lanjut.");
+                    // showMessageDialog("Peringatan", ... );
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -508,8 +697,10 @@ public class UserPage extends JFrame {
 
 class BrowsePanel extends JPanel {
     private DefaultTableModel model = new DefaultTableModel(new String[]{
-        "ID", "Kode", "ISBN", "Judul", "Penulis", "Penerbit", 
-        "Tahun", "Kategori", "Rak", "Stok Total", "Stok Tersedia"
+        "ID", Lang.get("books.table.id"), "ISBN", Lang.get("books.table.title"), 
+        Lang.get("books.table.author"), Lang.get("books.table.publisher"), 
+        Lang.get("books.table.year"), Lang.get("books.table.category"), 
+        Lang.get("books.form.location"), Lang.get("books.table.stock"), Lang.get("books.table.available")
     }, 0) {
         @Override
         public boolean isCellEditable(int row, int column) {
@@ -518,7 +709,7 @@ class BrowsePanel extends JPanel {
     };
     
     private JTable table = new JTable(model);
-    private JTextField search = Utils.input("Cari judul/kode/penulis/penerbit...");
+    private JTextField search = Utils.input(Lang.get("user.browse.placeholder"));
     private JButton btnRefresh;
     private JButton btnAddWishlist;
     private JLabel summaryLabel;
@@ -533,11 +724,11 @@ class BrowsePanel extends JPanel {
         header.setBackground(Utils.BG);
         header.setBorder(new EmptyBorder(20, 20, 20, 20));
         
-        JLabel title = new JLabel("Browse Books");
+        JLabel title = new JLabel(Lang.get("user.browse.title"));
         title.setForeground(Utils.TEXT);
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
         
-        JLabel subtitle = new JLabel("Jelajahi koleksi buku perpustakaan");
+        JLabel subtitle = new JLabel(Lang.get("user.browse.subtitle"));
         subtitle.setForeground(Utils.MUTED);
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         
@@ -551,12 +742,12 @@ class BrowsePanel extends JPanel {
         liveSearchPanel.setOpaque(false);
         
         // Search icon
-        JLabel searchIcon = new JLabel("Cari Buku");
+        JLabel searchIcon = new JLabel(Lang.get("user.browse.search_label"));
         searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         searchIcon.setForeground(Utils.TEXT);
         
         // Live search field (lebih kecil dari field utama)
-        JTextField liveSearchField = Utils.input("Live search...");
+        JTextField liveSearchField = Utils.input(Lang.get("user.browse.live_search"));
         liveSearchField.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         liveSearchField.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(Utils.BORDER),
@@ -644,10 +835,10 @@ class BrowsePanel extends JPanel {
             new EmptyBorder(10, 15, 10, 15)
         ));
         
-        JButton searchBtn = createPrimaryButton("Search");
+        JButton searchBtn = createPrimaryButton(Lang.get("btn.search"));
         searchBtn.addActionListener(e -> refresh());
         
-        JButton clearBtn = createSecondaryButton("Clear");
+        JButton clearBtn = createSecondaryButton(Lang.get("btn.reset"));
         clearBtn.addActionListener(e -> { 
             search.setText(""); 
             if (liveSearchField != null) {
@@ -684,7 +875,7 @@ class BrowsePanel extends JPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         buttonPanel.setOpaque(false);
         
-        btnAddWishlist = createPrimaryButton("Tambah ke Wishlist");
+        btnAddWishlist = createPrimaryButton(Lang.get("user.quickaction.wishlist"));
         
         btnRefresh.addActionListener(e -> refresh());
         btnAddWishlist.addActionListener(e -> addWishlist());
@@ -745,7 +936,7 @@ class BrowsePanel extends JPanel {
                         int stock = Integer.parseInt(value.toString());
                         if (stock <= 0) {
                             setForeground(new Color(234, 67, 53));
-                            if (column == 10) setText("HABIS");
+                            if (column == 10) setText(Lang.get("user.label.out_of_stock"));
                         } else if (stock <= 2) {
                             setForeground(new Color(251, 188, 5));
                         } else {
@@ -806,9 +997,10 @@ class BrowsePanel extends JPanel {
                 }
             }
             
-            btnRefresh.setText(totalBooks + " buku");
-            summaryLabel.setText("Total: " + totalBooks + " buku | Tersedia: " + availableBooks + 
-                " buku | Total Stok: " + totalStock);
+            btnRefresh.setText(String.format(Lang.get("user.label.total_books"), totalBooks));
+            summaryLabel.setText(String.format(Lang.get("user.label.total_books"), totalBooks) + " | " + 
+                String.format(Lang.get("user.label.available_books"), availableBooks) + " | " + 
+                String.format(Lang.get("user.label.total_stock"), totalStock));
             
             btnAddWishlist.setEnabled(table.getSelectedRow() >= 0);
             
@@ -821,7 +1013,7 @@ class BrowsePanel extends JPanel {
     void addWishlist() {
         int r = table.getSelectedRow();
         if (r < 0) { 
-            showMessageDialog("Peringatan", "Pilih buku terlebih dahulu."); 
+            showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
             return; 
         }
         
@@ -844,7 +1036,7 @@ class BrowsePanel extends JPanel {
             int count = Integer.parseInt(existing.get(0).get("c"));
             
             if (count > 0) {
-                showMessageDialog("Info", "Buku '" + judul + "' sudah ada di wishlist Anda.");
+                showMessageDialog("Info", String.format(Lang.get("user.msg.already_wishlist"), judul));
                 return;
             }
         } catch (Exception e) {
@@ -853,13 +1045,13 @@ class BrowsePanel extends JPanel {
             return;
         }
         
-        if (!confirmDialog("Tambah ke Wishlist", 
-            "Tambahkan buku '" + judul + "' ke wishlist Anda?")) return;
+        if (!confirmDialog(Lang.get("user.quickaction.wishlist"), 
+            String.format(Lang.get("user.msg.confirm_wishlist"), judul))) return;
         
         try {
             DB.exec("INSERT INTO wishlist(user_id,book_id) VALUES (?,?)", id(), bookId);
             DB.audit(id(), "CREATE", "wishlist", String.valueOf(bookId), "Tambah wishlist: " + judul);
-            showMessageDialog("Sukses", "Buku '" + judul + "' berhasil ditambahkan ke wishlist.");
+            showMessageDialog(Lang.get("msg.success"), String.format(Lang.get("user.msg.success_wishlist"), judul));
             refresh();
             
             // Refresh dashboard untuk update statistik wishlist
@@ -878,8 +1070,11 @@ class BrowsePanel extends JPanel {
 
     class WishlistPanel extends JPanel {
         private DefaultTableModel model = new DefaultTableModel(new String[]{
-            "ID", "Kode", "ISBN", "Judul", "Penulis", "Penerbit", 
-            "Tahun", "Kategori", "Rak", "Stok Total", "Stok Tersedia", "Status"
+            "ID", Lang.get("books.table.id"), "ISBN", Lang.get("books.table.title"), 
+            Lang.get("books.table.author"), Lang.get("books.table.publisher"), 
+            Lang.get("books.table.year"), Lang.get("books.table.category"), 
+            Lang.get("books.form.location"), Lang.get("books.table.stock"), Lang.get("books.table.available"), 
+            Lang.get("table.status")
         }, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -901,11 +1096,11 @@ class BrowsePanel extends JPanel {
             header.setBackground(Utils.BG);
             header.setBorder(new EmptyBorder(20, 20, 20, 20));
             
-            JLabel title = new JLabel("Wishlist / Favorit");
+            JLabel title = new JLabel(Lang.get("user.wishlist.title"));
             title.setForeground(Utils.TEXT);
             title.setFont(new Font("Segoe UI", Font.BOLD, 24));
             
-            JLabel subtitle = new JLabel("Daftar buku yang ingin Anda pinjam");
+            JLabel subtitle = new JLabel(Lang.get("user.wishlist.subtitle"));
             subtitle.setForeground(Utils.MUTED);
             subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
             
@@ -951,7 +1146,7 @@ class BrowsePanel extends JPanel {
             JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
             buttonPanel.setOpaque(false);
             
-            btnRemove = createPrimaryButton("Hapus dari Wishlist");
+            btnRemove = createPrimaryButton(Lang.get("btn.delete"));
             btnRemove.setEnabled(false);
             
             btnRefresh.addActionListener(e -> refresh());
@@ -1030,10 +1225,13 @@ class BrowsePanel extends JPanel {
                         String status = value.toString();
                         if ("TERSEDIA".equals(status)) {
                             setForeground(new Color(52, 168, 83));
+                            setText(Lang.get("user.label.available"));
                         } else if ("TERBATAS".equals(status)) {
                             setForeground(new Color(251, 188, 5));
+                            setText(Lang.get("user.label.limited"));
                         } else if ("HABIS".equals(status)) {
                             setForeground(new Color(234, 67, 53));
+                            setText(Lang.get("user.label.out_of_stock"));
                         }
                     }
                     
@@ -1093,9 +1291,11 @@ class BrowsePanel extends JPanel {
                     }
                 }
                 
-                btnRefresh.setText(total + " buku");
-                summaryLabel.setText("Total: " + total + " buku | Tersedia: " + available + 
-                    " | Terbatas: " + limited + " | Habis: " + outOfStock);
+                btnRefresh.setText(String.format(Lang.get("user.label.total_books"), total));
+                summaryLabel.setText(String.format(Lang.get("user.label.total_books"), total) + " | " + 
+                    Lang.get("user.label.available") + ": " + available + " | " + 
+                    Lang.get("user.label.limited") + ": " + limited + " | " + 
+                    Lang.get("user.label.out_of_stock") + ": " + outOfStock);
                 
                 btnRemove.setEnabled(table.getSelectedRow() >= 0);
                 
@@ -1108,7 +1308,7 @@ class BrowsePanel extends JPanel {
         void removeWish() {
             int r = table.getSelectedRow();
             if (r < 0) { 
-                showMessageDialog("Peringatan", "Pilih buku terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -1123,13 +1323,13 @@ class BrowsePanel extends JPanel {
                 return;
             }
             
-            if (!confirmDialog("Hapus dari Wishlist", 
-                "Hapus buku '" + judul + "' dari wishlist Anda?")) return;
+            if (!confirmDialog(Lang.get("btn.delete"), 
+                String.format(Lang.get("user.msg.confirm_remove_wishlist"), judul))) return;
             
             try {
                 DB.exec("DELETE FROM wishlist WHERE user_id=? AND book_id=?", id(), bookId);
                 DB.audit(id(), "DELETE", "wishlist", String.valueOf(bookId), "Hapus wishlist: " + judul);
-                showMessageDialog("Sukses", "Buku '" + judul + "' berhasil dihapus dari wishlist.");
+                showMessageDialog(Lang.get("msg.success"), String.format(Lang.get("user.msg.success_remove_wishlist"), judul));
                 refresh();
                 
                 // Refresh dashboard untuk update statistik wishlist
@@ -1143,8 +1343,8 @@ class BrowsePanel extends JPanel {
 
     class RiwayatPanel extends JPanel {
         private DefaultTableModel model = new DefaultTableModel(new String[]{
-            "Loan ID", "Tanggal Pinjam", "Jatuh Tempo", "Status", 
-            "Total Item", "Petugas", "Tanggal Kembali", "Denda", "Keterangan"
+            Lang.get("loan.table.id"), Lang.get("loan.table.loandate"), Lang.get("loan.table.duedate"), Lang.get("table.status"), 
+            Lang.get("table.total"), Lang.get("nav.staff"), Lang.get("return.table.returndate"), Lang.get("return.table.fine"), Lang.get("table.description")
         }, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -1165,11 +1365,11 @@ class BrowsePanel extends JPanel {
             header.setBackground(Utils.BG);
             header.setBorder(new EmptyBorder(20, 20, 20, 20));
             
-            JLabel title = new JLabel("Riwayat Peminjaman");
+            JLabel title = new JLabel(Lang.get("user.history.title"));
             title.setForeground(Utils.TEXT);
             title.setFont(new Font("Segoe UI", Font.BOLD, 24));
             
-            JLabel subtitle = new JLabel("Histori peminjaman buku Anda");
+            JLabel subtitle = new JLabel(Lang.get("user.history.subtitle"));
             subtitle.setForeground(Utils.MUTED);
             subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
             
@@ -1215,7 +1415,7 @@ class BrowsePanel extends JPanel {
             JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
             buttonPanel.setOpaque(false);
             
-            JButton detailBtn = createPrimaryButton("Lihat Detail Buku");
+            JButton detailBtn = createPrimaryButton(Lang.get("user.history.btn_detail"));
             
             btnRefresh.addActionListener(e -> refresh());
             detailBtn.addActionListener(e -> showLoanDetail());
@@ -1272,10 +1472,13 @@ class BrowsePanel extends JPanel {
                         if ("AKTIF".equals(value)) {
                             setForeground(new Color(66, 133, 244));
                             setFont(getFont().deriveFont(Font.BOLD));
+                            setText(Lang.get("status.active"));
                         } else if ("SELESAI".equals(value)) {
                             setForeground(new Color(52, 168, 83));
+                            setText(Lang.get("status.finished"));
                         } else if ("BATAL".equals(value)) {
                             setForeground(new Color(234, 67, 53));
+                            setText(Lang.get("status.cancelled"));
                         }
                     }
                     
@@ -1336,16 +1539,37 @@ class BrowsePanel extends JPanel {
                 
                 for (Map<String,String> r: rows) {
                     String fineTotal = r.get("fine_total") != null ? r.get("fine_total") : "0";
+                    
+                    // Localize keterangan logic
+                    String statusStr = r.get("status");
+                    String ket = r.get("keterangan");
+                    if ("AKTIF".equals(statusStr)) {
+                        if (ket.contains("Terlambat")) {
+                            // Extract days if possible, or just use a generic localized string
+                            ket = Lang.get("user.label.overdue_days").replace("%d", ket.replaceAll("[^0-9]", ""));
+                        } else if (ket.contains("hari ini")) {
+                            ket = Lang.get("user.label.due_today");
+                        } else if (ket.contains("besok")) {
+                            ket = Lang.get("user.label.due_tomorrow");
+                        } else {
+                            ket = Lang.get("status.active");
+                        }
+                    } else if ("SELESAI".equals(statusStr)) {
+                        ket = Lang.get("status.finished");
+                    } else if ("BATAL".equals(statusStr)) {
+                        ket = Lang.get("status.cancelled");
+                    }
+
                     model.addRow(new Object[]{ 
                         r.get("loan_id"), 
                         r.get("tanggal_pinjam"), 
                         r.get("jatuh_tempo"), 
-                        r.get("status"), 
+                        statusStr, 
                         r.get("total_item"),
                         r.get("petugas"),
                         r.get("tanggal_kembali"),
                         fineTotal,
-                        r.get("keterangan")
+                        ket
                     });
                     
                     total++;
@@ -1368,11 +1592,10 @@ class BrowsePanel extends JPanel {
                     }
                 }
                 
-                btnRefresh.setText(total + " riwayat");
-                summaryLabel.setText("Total: " + total + " | Aktif: " + aktif + 
-                    " | Selesai: " + selesai + " | Batal: " + batal + 
-                    (terlambat > 0 ? " | ⚠️Terlambat: " + terlambat : "") +
-                    (totalDenda > 0 ? " | Total Denda: Rp " + totalDenda : ""));
+                btnRefresh.setText(total + " " + Lang.get("nav.history"));
+                summaryLabel.setText(Lang.get("table.total") + ": " + total + " | " + Lang.get("status.active") + ": " + aktif + 
+                    " | " + Lang.get("status.finished") + ": " + selesai + " | " + Lang.get("status.cancelled") + ": " + batal + 
+                    (terlambat > 0 ? " | ⚠️" + Lang.get("user.stat.overdue") + ": " + terlambat : ""));
                 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1383,7 +1606,7 @@ class BrowsePanel extends JPanel {
         private void showLoanDetail() {
             int r = table.getSelectedRow();
             if (r < 0) { 
-                showMessageDialog("Peringatan", "Pilih riwayat peminjaman terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -1399,16 +1622,16 @@ class BrowsePanel extends JPanel {
                 );
                 
                 StringBuilder detail = new StringBuilder();
-                detail.append("=== Detail Buku yang Dipinjam ===\n");
+                detail.append("=== ").append(Lang.get("user.history.detail")).append(" ===\n");
                 detail.append("Loan ID: ").append(loanId).append("\n\n");
                 
                 int totalBuku = 0;
                 for (Map<String,String> item : items) {
                     detail.append("• ").append(item.get("code")).append(" - ")
                           .append(item.get("judul")).append("\n")
-                          .append("  Penulis: ").append(item.get("penulis")).append("\n")
-                          .append("  Penerbit: ").append(item.get("penerbit")).append("\n")
-                          .append("  Jumlah: ").append(item.get("qty")).append(" buku\n\n");
+                          .append("  ").append(Lang.get("books.table.author")).append(": ").append(item.get("penulis")).append("\n")
+                          .append("  ").append(Lang.get("books.table.publisher")).append(": ").append(item.get("penerbit")).append("\n")
+                          .append("  ").append(Lang.get("table.total")).append(": ").append(item.get("qty")).append(" ").append(Lang.get("nav.books")).append("\n\n");
                     totalBuku += Integer.parseInt(item.get("qty"));
                 }
                 
@@ -1435,8 +1658,8 @@ class BrowsePanel extends JPanel {
 
     class NotifPanel extends JPanel {
         private DefaultTableModel model = new DefaultTableModel(new String[]{
-            "Loan ID", "Tanggal Pinjam", "Jatuh Tempo", "Status", 
-            "Total Item", "Sisa Hari", "Keterangan", "Estimasi Denda"
+            Lang.get("loan.table.id"), Lang.get("loan.table.loandate"), Lang.get("loan.table.duedate"), Lang.get("table.status"), 
+            Lang.get("table.total"), Lang.get("table.days"), Lang.get("table.description"), Lang.get("return.table.fine")
         }, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -1457,11 +1680,11 @@ class BrowsePanel extends JPanel {
             header.setBackground(Utils.BG);
             header.setBorder(new EmptyBorder(20, 20, 20, 20));
             
-            JLabel title = new JLabel("Notifikasi");
+            JLabel title = new JLabel(Lang.get("nav.notifications"));
             title.setForeground(Utils.TEXT);
             title.setFont(new Font("Segoe UI", Font.BOLD, 24));
             
-            JLabel subtitle = new JLabel("Peringatan jatuh tempo dan keterlambatan peminjaman");
+            JLabel subtitle = new JLabel(Lang.get("user.wishlist.subtitle")); // Reuse or add new if needed
             subtitle.setForeground(Utils.MUTED);
             subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
             
@@ -1507,7 +1730,7 @@ class BrowsePanel extends JPanel {
             JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
             buttonPanel.setOpaque(false);
             
-             JButton remindBtn = createPrimaryButton("Buat Pengingat");
+             JButton remindBtn = createPrimaryButton(Lang.get("user.quickaction.notification"));
             
             btnRefresh.addActionListener(e -> refresh());
             remindBtn.addActionListener(e -> createReminder());
@@ -1648,6 +1871,18 @@ class BrowsePanel extends JPanel {
                 int totalEstimasiDenda = 0;
                 
                 for (Map<String,String> r: rows) {
+                    String ket = r.get("keterangan");
+                    if (ket.contains("Terlambat")) {
+                        ket = Lang.get("user.label.overdue_days").replace("%d", ket.replaceAll("[^0-9]", ""));
+                    } else if (ket.contains("hari ini")) {
+                        ket = Lang.get("user.label.due_today");
+                    } else if (ket.contains("besok")) {
+                        ket = Lang.get("user.label.due_tomorrow");
+                    } else {
+                        // For "Aktif (n hari lagi)" - this could be localized further but for now simplified
+                        ket = Lang.get("status.active");
+                    }
+
                     model.addRow(new Object[]{ 
                         r.get("loan_id"), 
                         r.get("tanggal_pinjam"), 
@@ -1655,7 +1890,7 @@ class BrowsePanel extends JPanel {
                         r.get("status"), 
                         r.get("total_item"),
                         r.get("sisa_hari"),
-                        r.get("keterangan"),
+                        ket,
                         r.get("estimasi_denda")
                     });
                     
@@ -1675,9 +1910,9 @@ class BrowsePanel extends JPanel {
                     }
                 }
                 
-                btnRefresh.setText(total + " notifikasi");
-                summaryLabel.setText("Total: " + total + " | Terlambat: " + terlambat + 
-                    " | Hari ini: " + dueToday + " | Besok: " + dueTomorrow +
+                btnRefresh.setText(total + " " + Lang.get("nav.notifications"));
+                summaryLabel.setText(Lang.get("table.total") + ": " + total + " | " + Lang.get("user.stat.overdue") + ": " + terlambat + 
+                    " | " + Lang.get("user.label.due_today") + ": " + dueToday + " | " + Lang.get("user.label.due_tomorrow") + ": " + dueTomorrow +
                     (totalEstimasiDenda > 0 ? " | Total Estimasi Denda: Rp " + totalEstimasiDenda : ""));
                 
                 if (total > 0) {
@@ -1693,7 +1928,7 @@ class BrowsePanel extends JPanel {
         private void createReminder() {
             int r = table.getSelectedRow();
             if (r < 0) { 
-                showMessageDialog("Peringatan", "Pilih notifikasi terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -1702,7 +1937,7 @@ class BrowsePanel extends JPanel {
             String keterangan = model.getValueAt(r, 6).toString();
             String estimasiDenda = model.getValueAt(r, 7).toString();
             
-            String message = "📌 **PENGINGAT PEMINJAMAN**\n\n" +
+            String message = "📌 **" + Lang.get("user.quickaction.notification").toUpperCase() + "**\n\n" +
                             "Loan ID: #" + loanId + "\n" +
                             "Jatuh Tempo: " + jatuhTempo + "\n" +
                             "Status: " + keterangan + "\n";

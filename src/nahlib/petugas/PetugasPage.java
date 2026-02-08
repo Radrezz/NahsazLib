@@ -1,8 +1,11 @@
 package nahlib.petugas;
 
+import nahlib.Lang;
 import nahlib.DB;
 import nahlib.LoginPage;
 import nahlib.Utils;
+import nahlib.CustomIcon;
+import nahlib.SimpleChart;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -19,12 +22,15 @@ public class PetugasPage extends JFrame {
     private final JPanel content = new JPanel(cards);
     private final Map<String, JPanel> panels = new HashMap<>();
     private final JPanel navPanel;
-    private final JButton[] navButtons;
+    private JButton[] navButtons; // Declare as field
+    
+    private JLabel appLogo;
+    private JLabel appTitle;
 
     public PetugasPage(Map<String,String> me) {
         this.me = me;
 
-        setTitle(Utils.getLibraryName() + " - Petugas Dashboard");
+        setTitle(Utils.getLibraryName() + " - " + Lang.get("petugas.dash.title"));
         setSize(1280, 780);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -42,21 +48,25 @@ public class PetugasPage extends JFrame {
         ));
 
         // Left side: Logo + Title
-        JPanel leftTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        JPanel leftTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         leftTop.setOpaque(false);
         
-        JLabel title = new JLabel(Utils.getLibraryName());
-        title.setForeground(Utils.ACCENT);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        appLogo = new JLabel();
+        updateLogo();
         
-        JLabel subtitle = new JLabel(" • Petugas Dashboard");
+        appTitle = new JLabel(Utils.getLibraryName());
+        appTitle.setForeground(Utils.ACCENT);
+        appTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        
+        JLabel subtitle = new JLabel(" • " + Lang.get("petugas.dash.title"));
         subtitle.setForeground(Utils.TEXT);
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         
-        leftTop.add(title);
+        leftTop.add(appLogo);
+        leftTop.add(appTitle);
         leftTop.add(subtitle);
 
-        // Right side: User info + Logout
+        // Right side: User info + Logout + Refresh
         JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rightTop.setOpaque(false);
         
@@ -66,13 +76,14 @@ public class PetugasPage extends JFrame {
             BorderFactory.createLineBorder(Utils.BORDER),
             new EmptyBorder(6, 12, 6, 12)
         ));
-        
+        // User icon using Graphics2D
+        JLabel userIcon = new JLabel(new CustomIcon(CustomIcon.Type.STAFF, 20, new Color(52, 168, 83)));
         
         JLabel who = new JLabel(me.get("nama_lengkap"));
         who.setForeground(Utils.TEXT);
         who.setFont(Utils.FONT_B);
         
-        JLabel role = new JLabel("PETUGAS");
+        JLabel role = new JLabel(Lang.get("role.staff"));
         role.setForeground(new Color(52, 168, 83)); // Green for petugas
         role.setFont(new Font("Segoe UI", Font.BOLD, 10));
         role.setBorder(BorderFactory.createCompoundBorder(
@@ -80,10 +91,45 @@ public class PetugasPage extends JFrame {
             new EmptyBorder(2, 6, 2, 6)
         ));
         
+        userCard.add(userIcon);
         userCard.add(who);
         userCard.add(role);
         
-        JButton logout = new JButton("Logout");
+        JButton refreshBtn = new JButton(Lang.get("btn.refresh"));
+        refreshBtn.setFont(Utils.FONT);
+        refreshBtn.setForeground(Utils.TEXT);
+        refreshBtn.setBackground(Utils.CARD);
+        refreshBtn.setBorder(BorderFactory.createCompoundBorder(
+             BorderFactory.createLineBorder(Utils.BORDER),
+             new EmptyBorder(8, 12, 8, 12)
+        ));
+        refreshBtn.setFocusPainted(false);
+        refreshBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        refreshBtn.addActionListener(e -> refreshApp());
+        
+        // Language Switcher Button
+        String currentLangText = Lang.getLanguage() == 0 ? "ID" : "EN";
+        JButton langBtn = new JButton(currentLangText, new CustomIcon(CustomIcon.Type.GLOBE, 16, Utils.TEXT));
+        langBtn.setHorizontalTextPosition(SwingConstants.RIGHT);
+        langBtn.setIconTextGap(8);
+        langBtn.setFont(Utils.FONT_B);
+        langBtn.setForeground(Utils.TEXT);
+        langBtn.setBackground(Utils.CARD);
+        langBtn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Utils.BORDER),
+            new EmptyBorder(8, 12, 8, 12)
+        ));
+        langBtn.setFocusPainted(false);
+        langBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        langBtn.setToolTipText(Lang.getLanguage() == 0 ? "Switch to English" : "Ganti ke Bahasa Indonesia");
+        langBtn.addActionListener(e -> {
+            int newLang = Lang.getLanguage() == 0 ? 1 : 0;
+            Lang.setLanguage(newLang);
+            dispose();
+            new PetugasPage(me).setVisible(true);
+        });
+        
+        JButton logout = new JButton(Lang.get("btn.logout"), new CustomIcon(CustomIcon.Type.LOGOUT, 16, Utils.TEXT));
         logout.setFont(Utils.FONT_B);
         logout.setForeground(Utils.TEXT);
         logout.setBackground(Utils.CARD);
@@ -94,22 +140,27 @@ public class PetugasPage extends JFrame {
         logout.setFocusPainted(false);
         logout.setCursor(new Cursor(Cursor.HAND_CURSOR));
         logout.addActionListener(e -> {
-            if (confirmDialog("Keluar", "Apakah Anda yakin ingin logout?")) {
+            if (confirmDialog(Lang.get("btn.logout"), Lang.get("msg.confirm_logout"))) {
                 DB.audit(Long.parseLong(me.get("user_id")), "LOGOUT", "users", me.get("user_id"), "Logout");
                 dispose();
                 new LoginPage();
             }
         });
         
-        logout.addMouseListener(new java.awt.event.MouseAdapter() {
+        java.awt.event.MouseAdapter hover = new java.awt.event.MouseAdapter() {
             public void mouseEntered(java.awt.event.MouseEvent evt) {
-                logout.setBackground(Utils.CARD2);
+                ((JButton)evt.getSource()).setBackground(Utils.CARD2);
             }
             public void mouseExited(java.awt.event.MouseEvent evt) {
-                logout.setBackground(Utils.CARD);
+                ((JButton)evt.getSource()).setBackground(Utils.CARD);
             }
-        });
+        };
+        logout.addMouseListener(hover);
+        refreshBtn.addMouseListener(hover);
+        langBtn.addMouseListener(hover);
 
+        rightTop.add(refreshBtn);
+        rightTop.add(langBtn);
         rightTop.add(userCard);
         rightTop.add(logout);
 
@@ -138,9 +189,22 @@ public class PetugasPage extends JFrame {
         content.add(notif, "notif");
 
         // =========== BOTTOM NAVIGATION ===========
-        String[] labels = new String[]{" Dashboard", " Peminjaman", "Pengembalian", "Laporan Saya", "Notifikasi"};
-        navButtons = new JButton[labels.length];
-        navPanel = createBottomNav(labels, 0);
+        String[] labels = new String[]{
+            Lang.get("nav.dashboard"), 
+            Lang.get("nav.loan"), 
+            Lang.get("nav.return"), 
+            Lang.get("nav.reports"), 
+            Lang.get("nav.notifications")
+        };
+        CustomIcon.Type[] icons = new CustomIcon.Type[]{
+            CustomIcon.Type.DASHBOARD,
+            CustomIcon.Type.BOOKS,
+            CustomIcon.Type.HOME,
+            CustomIcon.Type.REPORTS,
+            CustomIcon.Type.AUDIT
+        };
+        navButtons = new JButton[labels.length]; // Array init before use
+        navPanel = createBottomNav(labels, icons, 0);
 
         root.add(top, BorderLayout.NORTH);
         root.add(content, BorderLayout.CENTER);
@@ -150,15 +214,46 @@ public class PetugasPage extends JFrame {
         dash.refresh();
         setVisible(true);
     }
+    
+    private void refreshApp() {
+        updateLogo();
+        appTitle.setText(Utils.getLibraryName());
+        for (JPanel p : panels.values()) {
+            if (p.isVisible()) {
+                try {
+                    p.getClass().getMethod("refresh").invoke(p);
+                } catch (Exception e) {}
+            }
+        }
+    }
+    
+    private void updateLogo() {
+        try {
+            java.io.File f = new java.io.File("src/nahlib/nahsazlibrary.png");
+            if (f.exists()) {
+                ImageIcon ic = new ImageIcon(f.getAbsolutePath());
+                ic.getImage().flush();
+                appLogo.setIcon(new ImageIcon(Utils.makeCircularImage(ic.getImage(), 32)));
+            } else {
+                java.net.URL imgURL = getClass().getResource("/nahlib/nahsazlibrary.png");
+                if (imgURL != null) {
+                    ImageIcon ic = new ImageIcon(imgURL);
+                    appLogo.setIcon(new ImageIcon(Utils.makeCircularImage(ic.getImage(), 32)));
+                }
+            }
+        } catch (Exception e) {}
+    }
 
-    private JPanel createBottomNav(String[] labels, int activeIndex) {
+    private JPanel createBottomNav(String[] labels, CustomIcon.Type[] icons, int activeIndex) {
         JPanel bar = new JPanel(new GridLayout(1, labels.length, 1, 0));
         bar.setBackground(Utils.BG);
         bar.setBorder(new EmptyBorder(0, 0, 0, 0));
         
         for (int i = 0; i < labels.length; i++) {
-            JButton btn = createNavButton(labels[i], i == activeIndex);
-            navButtons[i] = btn;
+            JButton btn = createNavButton(labels[i], icons[i], i == activeIndex);
+            if (i < navButtons.length) {
+                navButtons[i] = btn;
+            }
             final int idx = i;
             btn.addActionListener(e -> {
                 switchPanel(idx);
@@ -168,8 +263,9 @@ public class PetugasPage extends JFrame {
         return bar;
     }
     
-    private JButton createNavButton(String text, boolean active) {
+    private JButton createNavButton(String text, CustomIcon.Type iconType, boolean active) {
         JButton btn = new JButton(text);
+        btn.putClientProperty("iconType", iconType);
         btn.setFont(Utils.FONT);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
@@ -177,6 +273,27 @@ public class PetugasPage extends JFrame {
         btn.setOpaque(true);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
+        applyButtonStyle(btn, active);
+        
+        if (!active) {
+            btn.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    if (btn.getBackground() != Utils.ACCENT) {
+                        btn.setBackground(Utils.CARD2);
+                    }
+                }
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    if (btn.getBackground() != Utils.ACCENT) {
+                        btn.setBackground(Utils.CARD);
+                    }
+                }
+            });
+        }
+        
+        return btn;
+    }
+    
+    private void applyButtonStyle(JButton btn, boolean active) {
         if (active) {
             btn.setBackground(Utils.ACCENT);
             btn.setForeground(Color.WHITE);
@@ -188,18 +305,11 @@ public class PetugasPage extends JFrame {
                 BorderFactory.createMatteBorder(1, 0, 0, 1, Utils.BORDER),
                 new EmptyBorder(14, 0, 14, 0)
             ));
-            
-            btn.addMouseListener(new java.awt.event.MouseAdapter() {
-                public void mouseEntered(java.awt.event.MouseEvent evt) {
-                    btn.setBackground(Utils.CARD2);
-                }
-                public void mouseExited(java.awt.event.MouseEvent evt) {
-                    btn.setBackground(Utils.CARD);
-                }
-            });
         }
         
-        return btn;
+        CustomIcon.Type icType = (CustomIcon.Type) btn.getClientProperty("iconType");
+        if (icType == null) icType = CustomIcon.Type.DASHBOARD;
+        btn.setIcon(new CustomIcon(icType, 18, active ? Color.WHITE : Utils.MUTED));
     }
     
     private void switchPanel(int index) {
@@ -208,13 +318,8 @@ public class PetugasPage extends JFrame {
         
         // Update button highlights
         for (int i = 0; i < navButtons.length; i++) {
-            JButton btn = navButtons[i];
-            if (i == index) {
-                btn.setBackground(Utils.ACCENT);
-                btn.setForeground(Color.WHITE);
-            } else {
-                btn.setBackground(Utils.CARD);
-                btn.setForeground(Utils.TEXT);
+            if (navButtons[i] != null) {
+                applyButtonStyle(navButtons[i], i == index);
             }
         }
         
@@ -247,10 +352,10 @@ public class PetugasPage extends JFrame {
     }
     
     private void updateNavBadge(int index, int count) {
-        if (navButtons[index] != null) {
-            String text = "Notifikasi";
+        if (navButtons != null && index >= 0 && index < navButtons.length && navButtons[index] != null) {
+            String text = Lang.get("nav.notifications");
             if (count > 0) {
-                text = "Notifikasi (" + count + ")";
+                text = Lang.get("nav.notifications") + " (" + count + ")";
             }
             navButtons[index].setText(text);
         }
@@ -313,21 +418,25 @@ public class PetugasPage extends JFrame {
         private final JLabel myMonth = createStatLabel("0");
         private final JLabel active = createStatLabel("0");
         private final JLabel overdueToday = createStatLabel("0");
+        
+        private SimpleChart barChart;
+        private SimpleChart lineChart;
 
         DashboardPanel() {
             setBackground(Utils.BG);
-            setLayout(new BorderLayout());
+            setLayout(new GridBagLayout()); // Bento Layout
             
             // Header
             JPanel header = new JPanel(new BorderLayout());
             header.setBackground(Utils.BG);
-            header.setBorder(new EmptyBorder(20, 20, 20, 20));
+            header.setBorder(new EmptyBorder(20, 30, 10, 30));
             
-            JLabel title = new JLabel("Dashboard Petugas");
+            JLabel title = new JLabel(Lang.get("petugas.dash.title"), new CustomIcon(CustomIcon.Type.DASHBOARD, 24, new Color(52, 168, 83)), SwingConstants.LEFT);
             title.setForeground(Utils.TEXT);
-            title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+            title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+            title.setIconTextGap(12);
             
-            JLabel subtitle = new JLabel("Ringkasan aktivitas Anda sebagai petugas");
+            JLabel subtitle = new JLabel(Lang.get("petugas.dash.subtitle"));
             subtitle.setForeground(Utils.MUTED);
             subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
             
@@ -337,28 +446,67 @@ public class PetugasPage extends JFrame {
             titlePanel.add(subtitle, BorderLayout.SOUTH);
             
             header.add(titlePanel, BorderLayout.WEST);
-            add(header, BorderLayout.NORTH);
+            
+            addGB(header, 0, 0, 3, 1, 1.0, 0.0);
 
-            // Stats Grid
-            JPanel grid = new JPanel(new GridLayout(2, 2, 16, 16));
-            grid.setBackground(Utils.BG);
-            grid.setBorder(new EmptyBorder(0, 20, 20, 20));
+            // === BENTO GRID CONTENT ===
+            // Quick Actions (Right Side - Tall - Spans 2 Rows)
+            addGB(createQuickActionsPanel(), 2, 1, 1, 2, 0.3, 0.5);
+
+            // Stats Grid (Left Side - 2x2)
+            addGB(createStatCard(Lang.get("petugas.stat.today_tx"), todayTx, new Color(66, 133, 244)), 0, 1, 1, 1, 0.35, 0.25);
+            addGB(createStatCard(Lang.get("petugas.stat.month_tx"), myMonth, new Color(52, 168, 83)), 1, 1, 1, 1, 0.35, 0.25);
+            addGB(createStatCard(Lang.get("petugas.stat.active_loan"), active, new Color(251, 188, 5)), 0, 2, 1, 1, 0.35, 0.25);
+            addGB(createStatCard(Lang.get("petugas.stat.global_overdue"), overdueToday, new Color(234, 67, 53)), 1, 2, 1, 1, 0.35, 0.25);
+
+            // Charts
+            barChart = new SimpleChart(SimpleChart.Type.BAR, new Color(66, 133, 244));
+            lineChart = new SimpleChart(SimpleChart.Type.LINE, new Color(52, 168, 83));
             
-            grid.add(createStatCard("Transaksi Hari Ini", todayTx, new Color(66, 133, 244)));
-            grid.add(createStatCard("Transaksi Bulan Ini", myMonth, new Color(66, 133, 244)));
-            grid.add(createStatCard("Peminjaman Aktif", active, new Color(251, 188, 5)));
-            grid.add(createStatCard("Terlambat (Global)", overdueToday, new Color(251, 188, 5)));
-            
-            add(grid, BorderLayout.CENTER);
-            
-            // Quick Actions Panel
-            add(createQuickActionsPanel(), BorderLayout.SOUTH);
+            JPanel barWrapper = Utils.card();
+            barWrapper.setLayout(new BorderLayout());
+            JLabel barLabel = new JLabel(Lang.get("petugas.chart.daily_vol"));
+            barLabel.setForeground(Utils.TEXT);
+            barLabel.setFont(Utils.FONT_B);
+            barLabel.setBorder(new EmptyBorder(0,0,10,0));
+            barWrapper.add(barLabel, BorderLayout.NORTH);
+            barWrapper.add(barChart, BorderLayout.CENTER);
+
+            JPanel lineWrapper = Utils.card();
+            lineWrapper.setLayout(new BorderLayout());
+            JLabel lineLabel = new JLabel(Lang.get("petugas.chart.trend"));
+            lineLabel.setForeground(Utils.TEXT);
+            lineLabel.setFont(Utils.FONT_B);
+            lineLabel.setBorder(new EmptyBorder(0,0,10,0));
+            lineWrapper.add(lineLabel, BorderLayout.NORTH);
+            lineWrapper.add(lineChart, BorderLayout.CENTER);
+
+            // Side-by-side charts at bottom, full width
+            addGB(barWrapper, 0, 3, 1, 1, 0.5, 0.4);
+            addGB(lineWrapper, 1, 3, 2, 1, 0.5, 0.4); 
+        }
+        
+        // Helper for GridBagLayout
+        private void addGB(Component comp, int x, int y, int w, int h, double wx, double wy) {
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = x;
+            gbc.gridy = y;
+            gbc.gridwidth = w;
+            gbc.gridheight = h;
+            gbc.weightx = wx;
+            gbc.weighty = wy;
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.insets = new Insets(8, 8, 8, 8);
+            if (x == 0) gbc.insets.left = 30;
+            if (x + w == 3) gbc.insets.right = 30;
+            if (y == 3) gbc.insets.bottom = 30;
+            add(comp, gbc);
         }
         
         private JLabel createStatLabel(String text) {
-            JLabel label = new JLabel(text, SwingConstants.CENTER);
+            JLabel label = new JLabel(text, SwingConstants.LEFT);
             label.setForeground(Utils.TEXT);
-            label.setFont(new Font("Segoe UI", Font.BOLD, 36));
+            label.setFont(new Font("Segoe UI", Font.BOLD, 32));
             return label;
         }
         
@@ -366,45 +514,49 @@ public class PetugasPage extends JFrame {
             JPanel card = new JPanel(new BorderLayout());
             card.setBackground(Utils.CARD);
             card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Utils.BORDER),
+                BorderFactory.createMatteBorder(0, 0, 0, 0, Utils.BORDER), 
                 new EmptyBorder(20, 20, 20, 20)
             ));
             
-            JPanel accentBar = new JPanel();
-            accentBar.setBackground(accentColor);
-            accentBar.setPreferredSize(new Dimension(card.getWidth(), 4));
-            card.add(accentBar, BorderLayout.NORTH);
-            
-            JPanel content = new JPanel(new BorderLayout(0, 10));
-            content.setOpaque(false);
-            content.add(value, BorderLayout.CENTER);
-            
-            JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
+            JPanel headerObj = new JPanel(new BorderLayout());
+            headerObj.setOpaque(false);
+            JLabel titleLabel = new JLabel(title.toUpperCase());
             titleLabel.setForeground(Utils.MUTED);
-            titleLabel.setFont(Utils.FONT);
-            content.add(titleLabel, BorderLayout.SOUTH);
+            titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            titleLabel.setBorder(new EmptyBorder(0, 0, 5, 0));
+            headerObj.add(titleLabel, BorderLayout.CENTER);
             
-            card.add(content, BorderLayout.CENTER);
+            card.add(headerObj, BorderLayout.NORTH);
+            card.add(value, BorderLayout.CENTER);
+            
+            JPanel bottomBar = new JPanel();
+            bottomBar.setBackground(accentColor);
+            bottomBar.setPreferredSize(new Dimension(0, 3));
+            card.add(bottomBar, BorderLayout.SOUTH);
+            
             return card;
         }
         
         private JPanel createQuickActionsPanel() {
             JPanel panel = new JPanel(new BorderLayout());
-            panel.setBackground(Utils.BG);
-            panel.setBorder(new EmptyBorder(0, 20, 20, 20));
+            panel.setBackground(Utils.CARD);
+            panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 0, 0, Utils.BORDER), 
+                new EmptyBorder(20, 20, 20, 20)
+            ));
             
-            JLabel title = new JLabel("Aksi Cepat");
-            title.setForeground(Utils.TEXT);
-            title.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            title.setBorder(new EmptyBorder(0, 0, 10, 0));
+            JLabel title = new JLabel(Lang.get("petugas.quickaction.title"));
+            title.setForeground(Utils.MUTED);
+            title.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            title.setBorder(new EmptyBorder(0, 0, 15, 0));
             
-            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
-            actions.setBackground(Utils.BG);
+            JPanel actions = new JPanel(new GridLayout(4, 1, 0, 10)); // Vertical Stack
+            actions.setBackground(Utils.CARD);
             
-            JButton newLoan = createSecondaryButton("Buat Peminjaman Baru");
-            JButton processReturn = createSecondaryButton("Proses Pengembalian");
-            JButton viewReport = createSecondaryButton(" Lihat Laporan");
-            JButton checkOverdue = createSecondaryButton("Cek Keterlambatan");
+            JButton newLoan = createActionButton(Lang.get("petugas.quickaction.new_loan"), CustomIcon.Type.BOOKS);
+            JButton processReturn = createActionButton(Lang.get("petugas.quickaction.return"), CustomIcon.Type.HOME);
+            JButton viewReport = createActionButton(Lang.get("petugas.quickaction.view_report"), CustomIcon.Type.REPORTS);
+            JButton checkOverdue = createActionButton(Lang.get("petugas.quickaction.check_overdue"), CustomIcon.Type.AUDIT);
             
             newLoan.addActionListener(e -> switchPanel(1));
             processReturn.addActionListener(e -> switchPanel(2));
@@ -420,6 +572,29 @@ public class PetugasPage extends JFrame {
             panel.add(actions, BorderLayout.CENTER);
             
             return panel;
+        }
+        
+        private JButton createActionButton(String text, CustomIcon.Type iconType) {
+            JButton btn = new JButton(text, new CustomIcon(iconType, 16, Utils.ACCENT));
+            btn.setFont(Utils.FONT);
+            btn.setForeground(Utils.TEXT);
+            btn.setBackground(Utils.BG);
+            btn.setHorizontalAlignment(SwingConstants.LEFT);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Utils.BORDER),
+                new EmptyBorder(10, 15, 10, 15)
+            ));
+            btn.setFocusPainted(false);
+            btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            btn.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    btn.setBackground(Utils.CARD2);
+                }
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    btn.setBackground(Utils.BG);
+                }
+            });
+            return btn;
         }
 
         void refresh() {
@@ -454,8 +629,21 @@ public class PetugasPage extends JFrame {
                 active.setText(String.valueOf(a));
                 overdueToday.setText(String.valueOf(o));
 
+                // Populate charts
+                List<String> days;
+                if (Lang.getLanguage() == 0) {
+                    days = List.of("Sen", "Sel", "Rab", "Kam", "Jum", "Sab");
+                } else {
+                    days = List.of("Mon", "Tue", "Wed", "Thu", "Fri", "Sat");
+                }
+                List<Double> transData = List.of(8.0, 12.0, 10.0, 15.0, 20.0, 5.0);
+                List<Double> trendData = List.of(20.0, 22.0, 25.0, 24.0, 28.0, 30.0);
+                
+                barChart.setData(days, transData);
+                lineChart.setData(days, trendData);
+
                 if (o > 0) {
-                    showMessageDialog("Peringatan", "Ada " + o + " transaksi terlambat (global). Cek halaman Notifikasi.");
+                    showMessageDialog(Lang.get("msg.warning"), String.format(Lang.get("user.label.total_books"), o).replace("buku", Lang.get("nav.loan")) + " " + Lang.get("user.stat.overdue") + ". " + Lang.get("user.quickaction.notification"));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -466,8 +654,10 @@ public class PetugasPage extends JFrame {
     class PeminjamanPanel extends JPanel {
         private JComboBox<Item> cbUser = new JComboBox<>();
         private JComboBox<Item> cbBook = new JComboBox<>();
-        private JTextField qty = Utils.input("qty (angka)");
-        private DefaultTableModel cart = new DefaultTableModel(new String[]{"BookID","Kode","Judul","Qty"},0);
+        private JTextField qty = Utils.input(Lang.get("petugas.loan.qty").toLowerCase());
+        private DefaultTableModel cart = new DefaultTableModel(new String[]{
+            Lang.get("books.table.id"), Lang.get("books.table.isbn"), Lang.get("books.table.title"), Lang.get("books.table.stock")
+        },0);
         private JTable table = new JTable(cart);
         private JLabel rulesInfo = new JLabel("");
         private JLabel cartSummary;
@@ -477,8 +667,8 @@ public class PetugasPage extends JFrame {
             setLayout(new BorderLayout());
             
             // Header
-            JPanel header = createPanelHeader("Peminjaman Buku", 
-                "Proses peminjaman buku untuk anggota (multi-buku)");
+            JPanel header = createPanelHeader(Lang.get("petugas.loan.title"), 
+                Lang.get("petugas.loan.subtitle"));
             
             // Main content with split pane
             JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
@@ -497,14 +687,14 @@ public class PetugasPage extends JFrame {
             styleCombo(cbBook);
             Utils.numericOnly(qty);
             
-            formCard.add(createFormRow("Pilih Anggota", cbUser));
-            formCard.add(createFormRow("Pilih Buku", cbBook));
-            formCard.add(createFormRow("Jumlah (Qty)", qty));
+            formCard.add(createFormRow(Lang.get("petugas.loan.select_member"), cbUser));
+            formCard.add(createFormRow(Lang.get("petugas.loan.select_book"), cbBook));
+            formCard.add(createFormRow(Lang.get("petugas.loan.qty"), qty));
             
             JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
             buttonRow.setOpaque(false);
-            JButton addCart = createPrimaryButton("Tambah ke Keranjang");
-            JButton clearCart = createSecondaryButton("Kosongkan");
+            JButton addCart = createPrimaryButton(Lang.get("btn.add"));
+            JButton clearCart = createSecondaryButton(Lang.get("btn.reset"));
             addCart.addActionListener(e -> addToCart());
             clearCart.addActionListener(e -> clearCart());
             buttonRow.add(addCart);
@@ -514,7 +704,7 @@ public class PetugasPage extends JFrame {
             leftPanel.add(formCard, BorderLayout.NORTH);
             
             // Cart summary
-            cartSummary = new JLabel("Keranjang: 0 item");
+            cartSummary = new JLabel(String.format(Lang.get("petugas.loan.cart_items"), 0, 0));
             cartSummary.setForeground(Utils.MUTED);
             cartSummary.setFont(Utils.FONT);
             cartSummary.setBorder(new EmptyBorder(10, 0, 0, 0));
@@ -529,7 +719,7 @@ public class PetugasPage extends JFrame {
             tableHeader.setBackground(Utils.BG);
             tableHeader.setBorder(new EmptyBorder(0, 0, 10, 0));
             
-            JLabel tableTitle = new JLabel("Keranjang Peminjaman");
+            JLabel tableTitle = new JLabel(Lang.get("petugas.loan.cart_title"));
             tableTitle.setForeground(Utils.TEXT);
             tableTitle.setFont(Utils.FONT_B);
             tableHeader.add(tableTitle, BorderLayout.WEST);
@@ -554,7 +744,7 @@ public class PetugasPage extends JFrame {
             rulesInfo.setForeground(Utils.MUTED);
             rulesInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
             
-            JButton submitBtn = createPrimaryButton("Proses Peminjaman");
+            JButton submitBtn = createPrimaryButton(Lang.get("petugas.quickaction.new_loan"));
             submitBtn.addActionListener(e -> submitLoan());
             
             bottomPanel.add(rulesInfo, BorderLayout.WEST);
@@ -660,8 +850,8 @@ public class PetugasPage extends JFrame {
             try {
                 cbUser.removeAllItems();
                 cbBook.removeAllItems();
-                cbUser.addItem(new Item(null, "-- Pilih Anggota --"));
-                cbBook.addItem(new Item(null, "-- Pilih Buku --"));
+                cbUser.addItem(new Item(null, "-- " + Lang.get("petugas.loan.select_member") + " --"));
+                cbBook.addItem(new Item(null, "-- " + Lang.get("petugas.loan.select_book") + " --"));
 
                 // Get active users
                 List<Map<String, String>> users = DB.query(
@@ -683,8 +873,8 @@ public class PetugasPage extends JFrame {
 
                 // Get rules
                 Map<String, Integer> rule = DB.rules();
-                rulesInfo.setText("Rules: maks " + rule.get("max_days") + " hari, maks " + 
-                    rule.get("max_books") + " buku, denda Rp " + rule.get("fine_per_day") + "/hari");
+                rulesInfo.setText(String.format(Lang.get("petugas.loan.rules"), rule.get("max_days"), 
+                    rule.get("max_books"), rule.get("fine_per_day")));
                 
                 updateCartSummary();
             } catch (Exception e) {
@@ -699,13 +889,13 @@ public class PetugasPage extends JFrame {
             for (int i = 0; i < totalItems; i++) {
                 totalQty += Integer.parseInt(cart.getValueAt(i, 3).toString());
             }
-            cartSummary.setText("Keranjang: " + totalItems + " item (" + totalQty + " buku)");
+            cartSummary.setText(String.format(Lang.get("petugas.loan.cart_items"), totalItems, totalQty));
         }
 
         void addToCart() {
             Item b = (Item) cbBook.getSelectedItem();
             if (b == null || b.id == null) { 
-                showMessageDialog("Peringatan", "Pilih buku terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -713,11 +903,11 @@ public class PetugasPage extends JFrame {
             try {
                 q = qty.getText().trim().isEmpty() ? 1 : Integer.parseInt(qty.getText().trim());
                 if (q <= 0) { 
-                    showMessageDialog("Peringatan", "Jumlah minimal 1."); 
+                    showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                     return; 
                 }
             } catch (NumberFormatException e) {
-                showMessageDialog("Peringatan", "Jumlah harus berupa angka.");
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info"));
                 return;
             }
             
@@ -732,7 +922,7 @@ public class PetugasPage extends JFrame {
                     if (cart.getValueAt(i, 0).toString().equals(b.id)) {
                         int old = Integer.parseInt(cart.getValueAt(i, 3).toString());
                         if (old + q > avail) {
-                            showMessageDialog("Peringatan", "Stok tidak cukup. Stok tersedia: " + avail);
+                            showMessageDialog(Lang.get("msg.warning"), Lang.get("user.label.out_of_stock") + " (" + avail + ")");
                             return;
                         }
                         cart.setValueAt(String.valueOf(old + q), i, 3);
@@ -742,7 +932,7 @@ public class PetugasPage extends JFrame {
                 }
                 
                 if (q > avail) {
-                    showMessageDialog("Peringatan", "Stok tidak cukup. Stok tersedia: " + avail);
+                    showMessageDialog(Lang.get("msg.warning"), Lang.get("user.label.out_of_stock") + " (" + avail + ")");
                     return;
                 }
                 
@@ -761,26 +951,26 @@ public class PetugasPage extends JFrame {
         
         private void clearCart() {
             if (cart.getRowCount() == 0) {
-                showMessageDialog("Info", "Keranjang sudah kosong.");
+                showMessageDialog(Lang.get("msg.info"), Lang.get("msg.no_data"));
                 return;
             }
             
-            if (confirmDialog("Konfirmasi", "Apakah Anda yakin ingin mengosongkan keranjang?")) {
+            if (confirmDialog(Lang.get("btn.delete"), Lang.get("msg.confirm_clear_cart"))) {
                 cart.setRowCount(0);
                 updateCartSummary();
-                showMessageDialog("Sukses", "Keranjang berhasil dikosongkan.");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success_delete"));
             }
         }
 
         void submitLoan() {
             Item u = (Item) cbUser.getSelectedItem();
             if (u == null || u.id == null) { 
-                showMessageDialog("Peringatan", "Pilih anggota terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
             if (cart.getRowCount() == 0) { 
-                showMessageDialog("Peringatan", "Keranjang kosong. Tambahkan buku terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.no_data")); 
                 return; 
             }
 
@@ -795,25 +985,24 @@ public class PetugasPage extends JFrame {
                 }
                 
                 if (totalQty > maxBooks) {
-                    showErrorDialog("Error", "Melebihi batas maksimum buku per transaksi (" + maxBooks + ").");
+                    showErrorDialog(Lang.get("msg.error"), String.format(Lang.get("petugas.loan.rules"), maxDays, maxBooks, rule.get("fine_per_day")));
                     return;
                 }
 
                 // Confirmation dialog with details
                 StringBuilder details = new StringBuilder();
-                details.append("Anggota: ").append(u.name).append("\n");
-                details.append("Jumlah buku: ").append(totalQty).append("\n");
-                details.append("Jatuh tempo: ").append(maxDays).append(" hari\n\n");
-                details.append("Detail buku:\n");
+                details.append(Lang.get("role.user")).append(": ").append(u.name).append("\n");
+                details.append(Lang.get("table.total")).append(": ").append(totalQty).append("\n");
+                details.append(Lang.get("loan.table.duedate")).append(": ").append(maxDays).append(" ").append(Lang.get("nav.history").toLowerCase()).append("\n\n");
+                details.append(Lang.get("petugas.return.book_list")).append(":\n");
                 
                 for (int i = 0; i < cart.getRowCount(); i++) {
                     details.append("- ").append(cart.getValueAt(i, 2)).append(" (")
                           .append(cart.getValueAt(i, 3)).append(" buku)\n");
                 }
 
-                if (!confirmDialog("Konfirmasi Peminjaman", 
-                    "Proses peminjaman untuk:\n\n" + details.toString() + 
-                    "\nApakah data sudah benar?")) return;
+                if (!confirmDialog(Lang.get("loan.confirm.title"), 
+                    String.format(Lang.get("petugas.loan.confirm_msg"), details.toString()))) return;
 
                 DB.tx(() -> {
                     // Check stock again before processing
@@ -853,17 +1042,17 @@ public class PetugasPage extends JFrame {
                         String.valueOf(loanId), "Peminjaman baru untuk " + u.name);
                 });
 
-                showMessageDialog("Sukses", "Peminjaman berhasil diproses.");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("loan.msg.success"));
                 
                 cart.setRowCount(0);
                 updateCartSummary();
                 refresh();
 
             } catch (RuntimeException ex) {
-                showErrorDialog("Error", ex.getMessage());
+                showErrorDialog(Lang.get("msg.error"), ex.getMessage());
             } catch (Exception ex) {
                 ex.printStackTrace();
-                showErrorDialog("Error", "Gagal memproses peminjaman: " + ex.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + ex.getMessage());
             }
         }
 
@@ -875,9 +1064,12 @@ public class PetugasPage extends JFrame {
     }
 
     class PengembalianPanel extends JPanel {
-        private DefaultTableModel model = new DefaultTableModel(new String[]{"LoanID","Anggota","Tanggal","Jatuh Tempo","Telat (hari)","Total Item"},0);
+        private DefaultTableModel model = new DefaultTableModel(new String[]{
+            Lang.get("loan.table.id"), Lang.get("loan.table.member"), Lang.get("table.date"), 
+            Lang.get("loan.table.duedate"), Lang.get("label.days_late"), Lang.get("table.total")
+        },0);
         private JTable table = new JTable(model);
-        private JLabel detail = new JLabel("Pilih transaksi untuk melihat detail & proses pengembalian.");
+        private JLabel detail = new JLabel(Lang.get("petugas.return.select_loan"));
         private JTextArea items = new JTextArea();
         private JButton btnProcess;
 
@@ -886,8 +1078,8 @@ public class PetugasPage extends JFrame {
             setLayout(new BorderLayout());
             
             // Header
-            JPanel header = createPanelHeader("Pengembalian Buku", 
-                "Proses pengembalian dan perhitungan denda otomatis");
+            JPanel header = createPanelHeader(Lang.get("petugas.return.title"), 
+                Lang.get("petugas.return.subtitle"));
             
             // Main split pane
             JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
@@ -924,7 +1116,7 @@ public class PetugasPage extends JFrame {
             items.setFont(new Font("Monospaced", Font.PLAIN, 12));
             items.setBorder(BorderFactory.createLineBorder(Utils.BORDER));
             
-            btnProcess = createPrimaryButton("Proses Pengembalian");
+            btnProcess = createPrimaryButton(Lang.get("petugas.quickaction.return"));
             btnProcess.setEnabled(false);
             btnProcess.addActionListener(e -> processReturn());
             
@@ -980,7 +1172,7 @@ public class PetugasPage extends JFrame {
             titlePanel.add(titleLabel, BorderLayout.NORTH);
             titlePanel.add(subtitleLabel, BorderLayout.SOUTH);
             
-            JButton refreshBtn = new JButton("Refresh");
+            JButton refreshBtn = new JButton(Lang.get("btn.refresh"));
             refreshBtn.setFont(Utils.FONT);
             refreshBtn.setBackground(Utils.CARD);
             refreshBtn.setForeground(Utils.TEXT);
@@ -1064,10 +1256,10 @@ public class PetugasPage extends JFrame {
                 }
                 
                 items.setText("");
-                detail.setText("Pilih transaksi untuk melihat detail & proses pengembalian.");
+                detail.setText(Lang.get("petugas.return.select_loan"));
             } catch (Exception e) {
                 e.printStackTrace();
-                showErrorDialog("Error", "Gagal memuat data: " + e.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + e.getMessage());
             }
         }
 
@@ -1091,13 +1283,13 @@ public class PetugasPage extends JFrame {
                 int fine = telat * finePerDay;
 
                 StringBuilder sb = new StringBuilder();
-                sb.append("=== Detail Transaksi ===\n");
+                sb.append("=== ").append(Lang.get("petugas.return.detail_title")).append(" ===\n");
                 sb.append("Loan ID: ").append(loanId).append("\n");
-                sb.append("Anggota: ").append(anggota).append("\n");
-                sb.append("Telat: ").append(telat).append(" hari\n");
+                sb.append(Lang.get("role.user")).append(": ").append(anggota).append("\n");
+                sb.append(Lang.get("label.days_late")).append(": ").append(telat).append(" ").append(Lang.get("nav.history").toLowerCase()).append("\n");
                 sb.append("Denda/hari: Rp ").append(finePerDay).append("\n");
                 sb.append("Total denda: Rp ").append(fine).append("\n\n");
-                sb.append("=== Daftar Buku ===\n");
+                sb.append("=== ").append(Lang.get("petugas.return.book_list")).append(" ===\n");
                 
                 for (Map<String, String> it: itemsRows) {
                     sb.append("• ").append(it.get("code")).append(" - ")
@@ -1106,15 +1298,15 @@ public class PetugasPage extends JFrame {
                 }
                 
                 if (telat > 0) {
-                    sb.append("\n⚠️ PERHATIAN: Transaksi terlambat!");
+                    sb.append("\n").append(Lang.get("petugas.return.fine_warning"));
                 }
-
-                detail.setText("Detail Transaksi: " + loanId + " - " + anggota);
+                
+                detail.setText(Lang.get("petugas.return.detail_title") + ": " + loanId + " - " + anggota);
                 items.setText(sb.toString());
 
             } catch (Exception e) {
                 e.printStackTrace();
-                showErrorDialog("Error", "Gagal memuat detail: " + e.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + e.getMessage());
             }
         }
 
@@ -1133,14 +1325,10 @@ public class PetugasPage extends JFrame {
                 Map<String, Integer> rule = DB.rules();
                 int fine = telat * rule.get("fine_per_day");
                 
-                String message = "Konfirmasi pengembalian:\n\n" +
-                               "Loan ID: " + loanId + "\n" +
-                               "Anggota: " + anggota + "\n" +
-                               "Keterlambatan: " + telat + " hari\n" +
-                               "Total denda: Rp " + fine + "\n\n" +
-                               "Apakah Anda yakin ingin memproses pengembalian ini?";
+                String message = String.format(Lang.get("petugas.return.confirm_msg"), 
+                    loanId, anggota, telat, fine);
                 
-                if (!confirmDialog("Konfirmasi Pengembalian", message)) return;
+                if (!confirmDialog(Lang.get("return.confirm.title"), message)) return;
 
                 DB.tx(() -> {
                     // Restore stock
@@ -1169,54 +1357,68 @@ public class PetugasPage extends JFrame {
                         "Pengembalian selesai untuk " + anggota);
                 });
 
-                showMessageDialog("Sukses", "Pengembalian berhasil diproses.\n" +
-                    (telat > 0 ? "Denda: Rp " + fine : "Tidak ada denda."));
+                showMessageDialog(Lang.get("msg.success"), Lang.get("return.msg.success") + "\n" +
+                    (telat > 0 ? Lang.get("label.fine") + ": Rp " + fine : Lang.get("return.status.ontime")));
                 
                 refresh();
 
             } catch (Exception ex) {
                 ex.printStackTrace();
-                showErrorDialog("Error", "Gagal memproses pengembalian: " + ex.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + ex.getMessage());
             }
         }
     }
 
     class LaporanSayaPanel extends JPanel {
-        private DefaultTableModel model = new DefaultTableModel(new String[]{"LoanID","Tanggal","Jatuh Tempo","Anggota","Status","Total Item"},0);
+        private DefaultTableModel model = new DefaultTableModel(new String[]{
+            Lang.get("loan.table.id"), Lang.get("table.date"), Lang.get("loan.table.duedate"), 
+            Lang.get("loan.table.member"), Lang.get("table.status"), Lang.get("table.total")
+        },0);
         private JTable table = new JTable(model);
         private JTextField from = Utils.input("YYYY-MM-DD");
         private JTextField to = Utils.input("YYYY-MM-DD");
+        private JTextField search = Utils.input(Lang.get("petugas.search.placeholder"));
 
         LaporanSayaPanel() {
             setBackground(Utils.BG);
             setLayout(new BorderLayout());
             
             // Header
-            JPanel header = createPanelHeader("Laporan Saya", 
-                "Riwayat transaksi yang Anda proses");
+            JPanel header = createPanelHeader(Lang.get("petugas.report.title"), 
+                Lang.get("petugas.report.subtitle"));
             
             // Filter panel
             JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
             filterPanel.setBackground(Utils.BG);
             filterPanel.setBorder(new EmptyBorder(0, 20, 10, 20));
             
-            filterPanel.add(new JLabel("Dari:"));
+            filterPanel.add(new JLabel(Lang.get("report.from") + ":"));
             filterPanel.add(from);
-            filterPanel.add(new JLabel("Sampai:"));
+            filterPanel.add(new JLabel(Lang.get("report.to") + ":"));
             filterPanel.add(to);
             
-            JButton filterBtn = createSecondaryButton("Filter");
-            JButton clearBtn = createSecondaryButton("Clear");
+            filterPanel.add(new JLabel("  " + Lang.get("btn.search") + ":"));
+            search.setPreferredSize(new Dimension(200, 35));
+            filterPanel.add(search);
+            
+            JButton filterBtn = createSecondaryButton(Lang.get("btn.filter"));
+            JButton clearBtn = createSecondaryButton(Lang.get("btn.reset"));
             
             filterBtn.addActionListener(e -> refresh());
             clearBtn.addActionListener(e -> { 
                 from.setText(""); 
                 to.setText(""); 
+                search.setText("");
                 refresh(); 
             });
             
             filterPanel.add(filterBtn);
             filterPanel.add(clearBtn);
+            
+            // Real-time search
+            search.addKeyListener(new java.awt.event.KeyAdapter() {
+                public void keyReleased(java.awt.event.KeyEvent e) { refresh(); }
+            });
             
             // Table
             styleTable();
@@ -1229,19 +1431,19 @@ public class PetugasPage extends JFrame {
             summaryPanel.setBackground(Utils.BG);
             summaryPanel.setBorder(new EmptyBorder(0, 20, 20, 20));
             
-            JLabel totalLabel = new JLabel("Total: 0 transaksi");
+            JLabel totalLabel = new JLabel(String.format(Lang.get("petugas.report.total_tx"), 0));
             totalLabel.setForeground(Utils.TEXT);
             totalLabel.setFont(Utils.FONT_B);
             
-            JLabel activeLabel = new JLabel("Aktif: 0");
+            JLabel activeLabel = new JLabel(Lang.get("status.active") + ": 0");
             activeLabel.setForeground(new Color(66, 133, 244));
             activeLabel.setFont(Utils.FONT_B);
             
-            JLabel completedLabel = new JLabel("Selesai: 0");
+            JLabel completedLabel = new JLabel(Lang.get("status.finished") + ": 0");
             completedLabel.setForeground(new Color(52, 168, 83));
             completedLabel.setFont(Utils.FONT_B);
             
-            JLabel cancelledLabel = new JLabel("Batal: 0");
+            JLabel cancelledLabel = new JLabel(Lang.get("status.cancelled") + ": 0");
             cancelledLabel.setForeground(new Color(234, 67, 53));
             cancelledLabel.setFont(Utils.FONT_B);
             
@@ -1276,7 +1478,7 @@ public class PetugasPage extends JFrame {
             titlePanel.add(titleLabel, BorderLayout.NORTH);
             titlePanel.add(subtitleLabel, BorderLayout.SOUTH);
             
-            JButton refreshBtn = new JButton("Refresh");
+            JButton refreshBtn = new JButton(Lang.get("btn.refresh"));
             refreshBtn.setFont(Utils.FONT);
             refreshBtn.setBackground(Utils.CARD);
             refreshBtn.setForeground(Utils.TEXT);
@@ -1372,6 +1574,13 @@ public class PetugasPage extends JFrame {
                     params.add(t);
                 }
 
+                String sQuery = search.getText().trim();
+                if (!sQuery.isEmpty()) {
+                    where.append(" AND (l.loan_id LIKE ? OR u.nama_lengkap LIKE ?)");
+                    params.add("%" + sQuery + "%");
+                    params.add("%" + sQuery + "%");
+                }
+
                 String sql = "SELECT l.loan_id, l.tanggal_pinjam, l.jatuh_tempo, u.nama_lengkap as anggota, l.status, " +
                            "(SELECT SUM(qty) FROM loan_items li WHERE li.loan_id = l.loan_id) as total_item " +
                            "FROM loans l JOIN users u ON l.user_id = u.user_id " +
@@ -1396,21 +1605,25 @@ public class PetugasPage extends JFrame {
                 
                 // Update summary labels
                 JPanel summaryPanel = (JPanel) getComponent(3);
-                ((JLabel)summaryPanel.getComponent(0)).setText("Total: " + total + " transaksi");
-                ((JLabel)summaryPanel.getComponent(1)).setText("Aktif: " + aktif);
-                ((JLabel)summaryPanel.getComponent(2)).setText("Selesai: " + selesai);
-                ((JLabel)summaryPanel.getComponent(3)).setText("Batal: " + batal);
+                ((JLabel)summaryPanel.getComponent(0)).setText("<html>" + Lang.get("petugas.report.total_tx").replace("%d", "<b>"+total+"</b>") + "</html>");
+                ((JLabel)summaryPanel.getComponent(1)).setText("<html>" + Lang.get("status.active") + ": <b style='color:#4285F4'>" + aktif + "</b></html>");
+                ((JLabel)summaryPanel.getComponent(2)).setText("<html>" + Lang.get("status.finished") + ": <b style='color:#34A853'>" + selesai + "</b></html>");
+                ((JLabel)summaryPanel.getComponent(3)).setText("<html>" + Lang.get("status.cancelled") + ": <b style='color:#EA4335'>" + batal + "</b></html>");
                 
             } catch (Exception e) {
                 e.printStackTrace();
-                showErrorDialog("Error", "Gagal memuat laporan: " + e.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + e.getMessage());
             }
         }
     }
 
     class NotifikasiPanel extends JPanel {
-        private DefaultTableModel model = new DefaultTableModel(new String[]{"LoanID","Anggota","Jatuh Tempo","Telat (hari)","Status"},0);
+        private DefaultTableModel model = new DefaultTableModel(new String[]{
+            Lang.get("loan.table.id"), Lang.get("loan.table.member"), Lang.get("loan.table.duedate"), 
+            Lang.get("label.days_late"), Lang.get("table.status")
+        },0);
         private JTable table = new JTable(model);
+        private JTextField search = Utils.input(Lang.get("petugas.search.placeholder"));
         private JLabel summaryLabel;
 
         NotifikasiPanel() {
@@ -1418,14 +1631,32 @@ public class PetugasPage extends JFrame {
             setLayout(new BorderLayout());
             
             // Header
-            JPanel header = createPanelHeader("Notifikasi Keterlambatan", 
-                "Peminjaman yang melewati jatuh tempo");
+            JPanel header = createPanelHeader(Lang.get("petugas.notif.title"), 
+                Lang.get("petugas.notif.subtitle"));
             
             // Table
             styleTable();
             JScrollPane scroll = new JScrollPane(table);
             scroll.getViewport().setBackground(Utils.CARD);
-            scroll.setBorder(new EmptyBorder(0, 20, 20, 20));
+            scroll.setBorder(new EmptyBorder(0, 20, 10, 20));
+            
+            // Filter Bar
+            JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+            filterBar.setBackground(Utils.BG);
+            filterBar.setBorder(new EmptyBorder(0, 20, 10, 20));
+            
+            filterBar.add(new JLabel(Lang.get("btn.search") + ":"));
+            search.setPreferredSize(new Dimension(300, 35));
+            filterBar.add(search);
+            
+            search.addKeyListener(new java.awt.event.KeyAdapter() {
+                public void keyReleased(java.awt.event.KeyEvent e) { refresh(); }
+            });
+            
+            JPanel centerPanel = new JPanel(new BorderLayout());
+            centerPanel.setOpaque(false);
+            centerPanel.add(filterBar, BorderLayout.NORTH);
+            centerPanel.add(scroll, BorderLayout.CENTER);
             
             // Action panel
             JPanel actionPanel = new JPanel(new BorderLayout());
@@ -1439,8 +1670,8 @@ public class PetugasPage extends JFrame {
             JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
             buttonPanel.setOpaque(false);
             
-            JButton refreshBtn = createPrimaryButton("Refresh");
-            JButton notifyBtn = createSecondaryButton("Notifikasi Anggota");
+            JButton refreshBtn = createPrimaryButton(Lang.get("btn.refresh"));
+            JButton notifyBtn = createSecondaryButton(Lang.get("btn.notify_member"));
             
             refreshBtn.addActionListener(e -> refresh());
             notifyBtn.addActionListener(e -> notifyAnggota());
@@ -1452,7 +1683,7 @@ public class PetugasPage extends JFrame {
             actionPanel.add(buttonPanel, BorderLayout.EAST);
             
             add(header, BorderLayout.NORTH);
-            add(scroll, BorderLayout.CENTER);
+            add(centerPanel, BorderLayout.CENTER);
             add(actionPanel, BorderLayout.SOUTH);
             
             refresh();
@@ -1564,13 +1795,21 @@ public class PetugasPage extends JFrame {
         void refresh() {
             try {
                 model.setRowCount(0);
-                List<Map<String, String>> rows = DB.query(
-                    "SELECT l.loan_id, u.nama_lengkap as anggota, l.jatuh_tempo, " +
+                String sQuery = search.getText().trim();
+                String sql = "SELECT l.loan_id, u.nama_lengkap as anggota, l.jatuh_tempo, " +
                     "GREATEST(DATEDIFF(CURDATE(), l.jatuh_tempo), 0) as telat, l.status " +
                     "FROM loans l JOIN users u ON l.user_id = u.user_id " +
-                    "WHERE l.status = 'AKTIF' AND l.jatuh_tempo < CURDATE() " +
-                    "ORDER BY telat DESC"
-                );
+                    "WHERE l.status = 'AKTIF' AND l.jatuh_tempo < CURDATE() ";
+                
+                List<Object> params = new ArrayList<>();
+                if (!sQuery.isEmpty()) {
+                    sql += " AND (l.loan_id LIKE ? OR u.nama_lengkap LIKE ?)";
+                    params.add("%" + sQuery + "%");
+                    params.add("%" + sQuery + "%");
+                }
+                sql += " ORDER BY telat DESC";
+                
+                List<Map<String, String>> rows = DB.query(sql, params.toArray());
 
                 int critical = 0, high = 0, medium = 0;
                 
@@ -1587,8 +1826,10 @@ public class PetugasPage extends JFrame {
                 }
                 
                 int total = rows.size();
-                summaryLabel.setText("Total: " + total + " | Kritis: " + critical + 
-                    " | Tinggi: " + high + " | Sedang: " + medium);
+                summaryLabel.setText("<html>" + Lang.get("table.total") + ": <b>" + total + "</b> | " + 
+                    "<span style='color:#EA4335'>" + Lang.get("petugas.notif.critical") + ": <b>" + critical + "</b></span> | " + 
+                    "<span style='color:#F57C00'>" + Lang.get("petugas.notif.high") + ": <b>" + high + "</b></span> | " + 
+                    "<span style='color:#388E3C'>" + Lang.get("petugas.notif.medium") + ": <b>" + medium + "</b></span></html>");
                 
                 if (total > 0) {
                     updateNavBadge(4, total);
@@ -1596,14 +1837,14 @@ public class PetugasPage extends JFrame {
                 
             } catch (Exception e) {
                 e.printStackTrace();
-                showErrorDialog("Error", "Gagal memuat notifikasi: " + e.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + e.getMessage());
             }
         }
         
         private void notifyAnggota() {
             int r = table.getSelectedRow();
             if (r < 0) { 
-                showMessageDialog("Peringatan", "Pilih transaksi terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -1611,14 +1852,14 @@ public class PetugasPage extends JFrame {
             String anggota = model.getValueAt(r, 1).toString();
             int telat = Integer.parseInt(model.getValueAt(r, 3).toString());
             
-            String message = "Kirim notifikasi kepada " + anggota + "?\n" +
+            String message = String.format(Lang.get("petugas.notif.send_to"), anggota) + "\n" +
                            "Loan ID: " + loanId + "\n" +
-                           "Telat: " + telat + " hari\n\n" +
-                           "(Fitur notifikasi email/SMS dalam pengembangan)";
+                           Lang.get("label.days_late") + ": " + telat + " " + Lang.get("nav.history").toLowerCase() + "\n\n" +
+                           Lang.get("petugas.notif.dev_note");
             
-            if (confirmDialog("Kirim Notifikasi", message)) {
-                showMessageDialog("Info", "Notifikasi berhasil dikirim ke " + anggota + 
-                    "\n\nCatatan: Fitur notifikasi email/SMS sedang dalam pengembangan.");
+            if (confirmDialog(Lang.get("petugas.quickaction.check_overdue"), message)) {
+                showMessageDialog(Lang.get("msg.info"), String.format(Lang.get("msg.success_notif"), anggota) + 
+                    "\n\n" + Lang.get("petugas.notif.dev_note"));
             }
         }
     }

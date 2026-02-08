@@ -1,8 +1,11 @@
 package nahlib.admin;
 
+import nahlib.Lang;
 import nahlib.DB;
 import nahlib.LoginPage;
 import nahlib.Utils;
+import nahlib.CustomIcon;
+import nahlib.SimpleChart;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -13,9 +16,17 @@ import javax.swing.table.JTableHeader;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Date;
 
 import static javax.swing.WindowConstants.EXIT_ON_CLOSE;
 
@@ -25,14 +36,17 @@ public class AdminPage extends JFrame {
     private final CardLayout cards = new CardLayout();
     private final JPanel content = new JPanel(cards);
     private final Map<String, JPanel> panels = new HashMap<>();
-    
+    private final JButton[] navButtons = new JButton[7]; // Store references to nav buttons
+    private JLabel appLogo;
+    private JLabel appTitle;
+
     // badge counts
     private int badgeOverdue = 0;
 
     public AdminPage(Map<String,String> me) {
         this.me = me;
 
-        setTitle(Utils.getLibraryName() + " - Admin Dashboard");
+        setTitle(Utils.getLibraryName() + " - " + Lang.get("user.dash.title"));
         setSize(1280, 780);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -52,18 +66,22 @@ public class AdminPage extends JFrame {
         ));
 
         // Left side: Logo + Title
-        JPanel leftTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        JPanel leftTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         leftTop.setOpaque(false);
         
-        JLabel title = new JLabel(Utils.getLibraryName());
-        title.setForeground(Utils.ACCENT);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        appLogo = new JLabel();
+        updateLogo();
         
-        JLabel subtitle = new JLabel(" • Admin Dashboard");
-        subtitle.setForeground(Utils.TEXT);
+        appTitle = new JLabel(Utils.getLibraryName());
+        appTitle.setForeground(Utils.ACCENT);
+        appTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        
+        JLabel subtitle = new JLabel(" • " + Lang.get("admin.dash.title"));
+        subtitle.setForeground(Utils.MUTED);
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         
-        leftTop.add(title);
+        leftTop.add(appLogo);
+        leftTop.add(appTitle);
         leftTop.add(subtitle);
 
         // Right side: User info + Logout
@@ -77,27 +95,25 @@ public class AdminPage extends JFrame {
             new EmptyBorder(6, 12, 6, 12)
         ));
         
-        // User icon placeholder
-        JLabel userIcon = new JLabel("👤");
-        userIcon.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        // User icon using Graphics2D
+        JLabel userIcon = new JLabel(new CustomIcon(CustomIcon.Type.STAFF, 20, Utils.ACCENT));
         
         JLabel who = new JLabel(me.get("nama_lengkap"));
         who.setForeground(Utils.TEXT);
         who.setFont(Utils.FONT_B);
         
-        JLabel role = new JLabel("ADMIN");
-        role.setForeground(Utils.ACCENT);
+        JLabel role = new JLabel(Lang.get("role.admin"));
+        role.setForeground(Color.WHITE);
+        role.setBackground(Utils.ACCENT);
+        role.setOpaque(true);
         role.setFont(new Font("Segoe UI", Font.BOLD, 10));
-        role.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Utils.ACCENT),
-            new EmptyBorder(2, 6, 2, 6)
-        ));
+        role.setBorder(new EmptyBorder(2, 6, 2, 6));
         
         userCard.add(userIcon);
         userCard.add(who);
         userCard.add(role);
         
-        JButton logout = new JButton("Logout");
+        JButton logout = new JButton(Lang.get("btn.logout"), new CustomIcon(CustomIcon.Type.LOGOUT, 16, Utils.TEXT));
         logout.setFont(Utils.FONT_B);
         logout.setForeground(Utils.TEXT);
         logout.setBackground(Utils.CARD);
@@ -108,7 +124,7 @@ public class AdminPage extends JFrame {
         logout.setFocusPainted(false);
         logout.setCursor(new Cursor(Cursor.HAND_CURSOR));
         logout.addActionListener(e -> {
-            if (confirmDialog("Keluar", "Apakah Anda yakin ingin logout?")) {
+            if (confirmDialog(Lang.get("btn.logout"), Lang.get("msg.confirm_logout"))) {
                 DB.audit(Long.valueOf(id()), "LOGOUT", "users", me.get("user_id"), "Logout");
                 dispose();
                 new LoginPage();
@@ -124,7 +140,67 @@ public class AdminPage extends JFrame {
                 logout.setBackground(Utils.CARD);
             }
         });
+        
+        // Language Switcher Button
+        String currentLangText = Lang.getLanguage() == 0 ? "ID" : "EN";
+        JButton langBtn = new JButton(currentLangText);
+        langBtn.setFont(Utils.FONT_B);
+        langBtn.setForeground(Utils.TEXT);
+        langBtn.setBackground(Utils.CARD);
+        langBtn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Utils.BORDER),
+            new EmptyBorder(8, 12, 8, 12)
+        ));
+        langBtn.setFocusPainted(false);
+        langBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        langBtn.setToolTipText(Lang.getLanguage() == 0 ? "Switch to English" : "Ganti ke Bahasa Indonesia");
+        
+        langBtn.addActionListener(e -> {
+            // Toggle language
+            int newLang = Lang.getLanguage() == 0 ? 1 : 0;
+            Lang.setLanguage(newLang);
+            
+            // Reload page
+            dispose();
+            new AdminPage(me).setVisible(true);
+        });
+        
+        // Add Globe Icon to langBtn
+        langBtn.setIcon(new CustomIcon(CustomIcon.Type.GLOBE, 16, Utils.TEXT));
+        langBtn.setHorizontalTextPosition(SwingConstants.RIGHT);
+        langBtn.setIconTextGap(8);
+        
+        // Hover effect for language button
+        langBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                langBtn.setBackground(Utils.CARD2);
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                langBtn.setBackground(Utils.CARD);
+            }
+        });
 
+        // Global Refresh Button
+        JButton refreshBtn = new JButton(Lang.get("btn.refresh"));
+        refreshBtn.setFont(Utils.FONT_B);
+        refreshBtn.setForeground(Utils.TEXT);
+        refreshBtn.setBackground(Utils.CARD);
+        refreshBtn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Utils.BORDER),
+            new EmptyBorder(8, 16, 8, 16)
+        ));
+        refreshBtn.setFocusPainted(false);
+        refreshBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        refreshBtn.addActionListener(e -> refreshApp());
+        
+        // Hover effect for refresh button
+        refreshBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) { refreshBtn.setBackground(Utils.CARD2); }
+            public void mouseExited(java.awt.event.MouseEvent evt) { refreshBtn.setBackground(Utils.CARD); }
+        });
+
+        rightTop.add(refreshBtn);
+        rightTop.add(langBtn);
         rightTop.add(userCard);
         rightTop.add(logout);
 
@@ -160,21 +236,38 @@ public class AdminPage extends JFrame {
 
         // =========== BOTTOM NAVIGATION ===========
         String[] labels = new String[]{
-            "Dashboard", "Petugas", "Anggota", 
-            "Buku", "Laporan", "️Settings", "Activity Log"
+            Lang.get("nav.dashboard"), 
+            Lang.get("nav.staff"), 
+            Lang.get("nav.members"), 
+            Lang.get("nav.books"), 
+            Lang.get("nav.reports"), 
+            Lang.get("nav.audit"),
+            Lang.get("nav.settings")
         };
         
+        // Nav Actions
         Runnable[] actions = new Runnable[]{
             () -> { dashboard.refresh(); show("dash", 0); },
             () -> { petugas.refresh(); show("petugas", 1); },
             () -> { anggota.refresh(); show("anggota", 2); },
             () -> { buku.refresh(); show("buku", 3); },
             () -> { laporan.refresh(); show("laporan", 4); },
-            () -> { settings.refresh(); show("settings", 5); },
-            () -> { audit.refresh(); show("audit", 6); }
+            () -> { audit.refresh(); show("audit", 5); },
+            () -> { settings.refresh(); show("settings", 6); }
         };
         
-        JPanel nav = createBottomNav(labels, actions, 0);
+        // Icon types for each nav item
+        CustomIcon.Type[] icons = new CustomIcon.Type[]{
+            CustomIcon.Type.DASHBOARD,  // Dashboard
+            CustomIcon.Type.STAFF,      // Staff
+            CustomIcon.Type.USERS,      // Members
+            CustomIcon.Type.BOOKS,      // Books
+            CustomIcon.Type.REPORTS,    // Reports
+            CustomIcon.Type.AUDIT,      // Activity Log
+            CustomIcon.Type.SETTINGS    // Settings
+        };
+        
+        JPanel nav = createBottomNav(labels, icons, actions, 0);
 
         // =========== ASSEMBLE ROOT ===========
         root.add(top, BorderLayout.NORTH);
@@ -195,25 +288,28 @@ public class AdminPage extends JFrame {
         updateNavHighlight(activeIndex);
     }
     
-    private JPanel createBottomNav(String[] labels, Runnable[] actions, int activeIndex) {
+    private JPanel createBottomNav(String[] labels, CustomIcon.Type[] icons, Runnable[] actions, int activeIndex) {
         JPanel bar = new JPanel(new GridLayout(1, labels.length, 1, 0));
         bar.setBackground(Utils.BG);
         bar.setBorder(new EmptyBorder(0, 0, 0, 0));
         
         for (int i = 0; i < labels.length; i++) {
-            JButton btn = createNavButton(labels[i], i == activeIndex);
+            JButton btn = createNavButton(labels[i], icons[i], i == activeIndex);
+            navButtons[i] = btn; // Store reference
+            
             int idx = i;
             btn.addActionListener(e -> {
                 actions[idx].run();
-                updateNavHighlight(idx);
+                // updateNavHighlight will be called by actions[idx] -> show(...)
             });
             bar.add(btn);
         }
         return bar;
     }
     
-    private JButton createNavButton(String text, boolean active) {
+    private JButton createNavButton(String text, CustomIcon.Type iconType, boolean active) {
         JButton btn = new JButton(text);
+        btn.putClientProperty("iconType", iconType); // Store icon type
         btn.setFont(Utils.FONT);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
@@ -221,6 +317,27 @@ public class AdminPage extends JFrame {
         btn.setOpaque(true);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
+        applyButtonStyle(btn, active);
+        
+        // Hover effects
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                // Only change if not active (simple logic check, though active style overrides)
+                if (btn.getBackground() != Utils.ACCENT) {
+                    btn.setBackground(Utils.CARD2);
+                }
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                if (btn.getBackground() != Utils.ACCENT) {
+                    btn.setBackground(Utils.CARD);
+                }
+            }
+        });
+        
+        return btn;
+    }
+    
+    private void applyButtonStyle(JButton btn, boolean active) {
         if (active) {
             btn.setBackground(Utils.ACCENT);
             btn.setForeground(Color.WHITE);
@@ -232,59 +349,70 @@ public class AdminPage extends JFrame {
                 BorderFactory.createMatteBorder(1, 0, 0, 1, Utils.BORDER),
                 new EmptyBorder(14, 0, 14, 0)
             ));
-            
-            btn.addMouseListener(new java.awt.event.MouseAdapter() {
-                public void mouseEntered(java.awt.event.MouseEvent evt) {
-                    btn.setBackground(Utils.CARD2);
-                }
-                public void mouseExited(java.awt.event.MouseEvent evt) {
-                    btn.setBackground(Utils.CARD);
-                }
-            });
         }
         
-        return btn;
+        // Icon color update (recreate icon from stored type)
+        CustomIcon.Type icType = (CustomIcon.Type) btn.getClientProperty("iconType");
+        if (icType == null) icType = CustomIcon.Type.DASHBOARD;
+        
+        btn.setIcon(new CustomIcon(icType, 18, active ? Color.WHITE : Utils.MUTED));
     }
     
-    private void updateNavHighlight(int activeIndex) {
-        JPanel root = (JPanel) getContentPane();
-        Component[] comps = root.getComponents();
+    // Refresh Global Assets & Active Panel
+    private void refreshApp() {
+        // 1. Update Logo & Title
+        updateLogo();
+        if (appTitle != null) appTitle.setText(Utils.getLibraryName());
         
-        for (int i = 0; i < comps.length; i++) {
-            if (comps[i] instanceof JPanel) {
-                JPanel panel = (JPanel) comps[i];
-                // PERBAIKAN: Gunakan instanceof Container dan cek komponennya
-                if (panel.getComponentCount() > 0) {
-                    Component child = panel.getComponent(0);
-                    if (child instanceof JPanel) {
-                        JPanel childPanel = (JPanel) child;
-                        // Cek jumlah komponen dalam child panel
-                        if (childPanel.getComponentCount() >= 7) {
-                            root.remove(i);
-                            
-                            String[] labels = new String[]{
-                                "Dashboard", "Petugas", "Anggota", 
-                                "Buku", "Laporan", "Settings", "Activity Log"
-                            };
-                            
-                            Runnable[] actions = new Runnable[]{
-                                () -> { ((DashboardPanel)panels.get("dash")).refresh(); show("dash", 0); },
-                                () -> { ((PetugasPanel)panels.get("petugas")).refresh(); show("petugas", 1); },
-                                () -> { ((AnggotaPanel)panels.get("anggota")).refresh(); show("anggota", 2); },
-                                () -> { ((BukuPanel)panels.get("buku")).refresh(); show("buku", 3); },
-                                () -> { ((LaporanPanel)panels.get("laporan")).refresh(); show("laporan", 4); },
-                                () -> { ((SettingsPanel)panels.get("settings")).refresh(); show("settings", 5); },
-                                () -> { ((AuditPanel)panels.get("audit")).refresh(); show("audit", 6); }
-                            };
-                            
-                            JPanel newNav = createBottomNav(labels, actions, activeIndex);
-                            root.add(newNav, BorderLayout.SOUTH);
-                            root.revalidate();
-                            root.repaint();
-                            break;
-                        }
+        // 2. Refresh active panels via reflection
+        for (JPanel p : panels.values()) {
+            if (p.isVisible()) {
+                try {
+                    // Call void refresh() method if exists
+                    p.getClass().getMethod("refresh").invoke(p);
+                } catch (Exception e) {
+                    // Panel might not have refresh method or is inaccessible
+                }
+            }
+        }
+        
+        // 3. Repaint top bar
+        if (appLogo != null) {
+            appLogo.revalidate();
+            appLogo.repaint();
+        }
+    }
+    
+    private void updateLogo() {
+        try {
+            // First try loading from file system (user uploaded)
+            File f = new File("src/nahlib/nahsazlibrary.png");
+            if (f.exists()) {
+                ImageIcon ic = new ImageIcon(f.getAbsolutePath());
+                // Flush to ensure no caching of old image
+                ic.getImage().flush();
+                if (appLogo != null) {
+                    appLogo.setIcon(new ImageIcon(Utils.makeCircularImage(ic.getImage(), 32)));
+                }
+            } else {
+                // Fallback to resource
+                java.net.URL imgURL = getClass().getResource("/nahlib/nahsazlibrary.png");
+                if (imgURL != null) {
+                    ImageIcon ic = new ImageIcon(imgURL);
+                    if (appLogo != null) {
+                        appLogo.setIcon(new ImageIcon(Utils.makeCircularImage(ic.getImage(), 32)));
                     }
                 }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateNavHighlight(int activeIndex) {
+        for (int i = 0; i < navButtons.length; i++) {
+            if (navButtons[i] != null) {
+                applyButtonStyle(navButtons[i], i == activeIndex);
             }
         }
     }
@@ -346,21 +474,25 @@ public class AdminPage extends JFrame {
         private final JLabel lbMembers = createStatLabel("0");
         private final JLabel lbActive = createStatLabel("0");
         private final JLabel lbOverdue = createStatLabel("0");
+        
+        private SimpleChart barChart;
+        private SimpleChart lineChart;
 
         DashboardPanel() {
             setBackground(Utils.BG);
-            setLayout(new BorderLayout());
+            setLayout(new GridBagLayout()); // Bento Layout
             
             // Header
             JPanel header = new JPanel(new BorderLayout());
             header.setBackground(Utils.BG);
-            header.setBorder(new EmptyBorder(20, 20, 20, 20));
+            header.setBorder(new EmptyBorder(20, 30, 10, 30));
             
-            JLabel title = new JLabel("Dashboard Overview");
+            JLabel title = new JLabel(Lang.get("admin.dash.title"), new CustomIcon(CustomIcon.Type.DASHBOARD, 24, Utils.ACCENT), SwingConstants.LEFT);
             title.setForeground(Utils.TEXT);
-            title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+            title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+            title.setIconTextGap(12);
             
-            JLabel subtitle = new JLabel("Ringkasan statistik perpustakaan");
+            JLabel subtitle = new JLabel(Lang.get("admin.dash.subtitle"));
             subtitle.setForeground(Utils.MUTED);
             subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
             
@@ -370,25 +502,71 @@ public class AdminPage extends JFrame {
             titlePanel.add(subtitle, BorderLayout.SOUTH);
             
             header.add(titlePanel, BorderLayout.WEST);
-            add(header, BorderLayout.NORTH);
+            
+            // Add Header (Top, Span 3)
+            addGB(header, 0, 0, 3, 1, 1.0, 0.0);
 
-            // Stats Grid
-            JPanel grid = new JPanel(new GridLayout(2, 2, 16, 16));
-            grid.setBackground(Utils.BG);
-            grid.setBorder(new EmptyBorder(0, 20, 20, 20));
+            // === BENTO GRID CONTENT ===
+            // Stats Block (Left Side - 2x2 Grid)
+            // Stat 1: Books (Top Left)
+            addGB(createStatCard(Lang.get("admin.dash.books"), lbBooks, Utils.ACCENT), 0, 1, 1, 1, 0.25, 0.25);
+            // Stat 2: Members (Top Middle)
+            addGB(createStatCard(Lang.get("admin.dash.members"), lbMembers, new Color(52, 168, 83)), 1, 1, 1, 1, 0.25, 0.25);
+            // Stat 3: Active Loans (Bottom Left)
+            addGB(createStatCard(Lang.get("admin.dash.active_loans"), lbActive, new Color(251, 188, 5)), 0, 2, 1, 1, 0.25, 0.25);
+            // Stat 4: Overdue (Bottom Middle)
+            addGB(createStatCard(Lang.get("admin.dash.overdue"), lbOverdue, new Color(234, 67, 53)), 1, 2, 1, 1, 0.25, 0.25);
+
+            // Charts
+            barChart = new SimpleChart(SimpleChart.Type.BAR, Utils.ACCENT);
+            lineChart = new SimpleChart(SimpleChart.Type.LINE, new Color(52, 168, 83));
+
+            // Main Chart (Right Side - Tall - Spans 2 Rows)
+            JPanel barWrapper = Utils.card();
+            barWrapper.setLayout(new BorderLayout());
+            JLabel barTitle = new JLabel(Lang.get("admin.dash.loan_trend"));
+            barTitle.setForeground(Utils.TEXT);
+            barTitle.setFont(Utils.FONT_B);
+            barTitle.setBorder(new EmptyBorder(0,0,10,0));
+            barWrapper.add(barTitle, BorderLayout.NORTH);
+            barWrapper.add(barChart, BorderLayout.CENTER);
             
-            grid.add(createStatCard("Total Buku", lbBooks, Utils.ACCENT));
-            grid.add(createStatCard("Total Anggota", lbMembers, Utils.ACCENT));
-            grid.add(createStatCard("Peminjaman Aktif", lbActive, new Color(251, 188, 5)));
-            grid.add(createStatCard("Terlambat", lbOverdue, new Color(251, 188, 5)));
+            addGB(barWrapper, 2, 1, 1, 2, 0.5, 0.5); // Spans 2 rows on the right
             
-            add(grid, BorderLayout.CENTER);
+            // Secondary Chart (Bottom - Wide - Spans 3 Cols)
+            JPanel lineWrapper = Utils.card();
+            lineWrapper.setLayout(new BorderLayout());
+            JLabel lineTitle = new JLabel(Lang.get("admin.dash.user_trend"));
+            lineTitle.setForeground(Utils.TEXT);
+            lineTitle.setFont(Utils.FONT_B);
+            lineTitle.setBorder(new EmptyBorder(0,0,10,0));
+            lineWrapper.add(lineTitle, BorderLayout.NORTH);
+            lineWrapper.add(lineChart, BorderLayout.CENTER);
+            
+            addGB(lineWrapper, 0, 3, 3, 1, 1.0, 0.4); // Wide chart at bottom
+        }
+        
+        // Helper for GridBagLayout
+        private void addGB(Component comp, int x, int y, int w, int h, double wx, double wy) {
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = x;
+            gbc.gridy = y;
+            gbc.gridwidth = w;
+            gbc.gridheight = h;
+            gbc.weightx = wx;
+            gbc.weighty = wy;
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.insets = new Insets(8, 8, 8, 8); // Padding between bento boxes
+            if (x == 0) gbc.insets.left = 30; // Left margin
+            if (x + w == 3) gbc.insets.right = 30; // Right margin for last col (assuming 3 cols total)
+            if (y == 3) gbc.insets.bottom = 30; // Bottom margin
+            add(comp, gbc);
         }
         
         private JLabel createStatLabel(String text) {
-            JLabel label = new JLabel(text, SwingConstants.CENTER);
+            JLabel label = new JLabel(text, SwingConstants.LEFT);
             label.setForeground(Utils.TEXT);
-            label.setFont(new Font("Segoe UI", Font.BOLD, 36));
+            label.setFont(new Font("Segoe UI", Font.BOLD, 32));
             return label;
         }
         
@@ -396,25 +574,36 @@ public class AdminPage extends JFrame {
             JPanel card = new JPanel(new BorderLayout());
             card.setBackground(Utils.CARD);
             card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Utils.BORDER),
+                BorderFactory.createMatteBorder(0, 0, 0, 0, Utils.BORDER), // Clean border
                 new EmptyBorder(20, 20, 20, 20)
             ));
             
-            JPanel accentBar = new JPanel();
-            accentBar.setBackground(accentColor);
-            accentBar.setPreferredSize(new Dimension(card.getWidth(), 4));
-            card.add(accentBar, BorderLayout.NORTH);
+            // Modern "Chip" styling (Rounded accent indicator)
+            JPanel headerObj = new JPanel(new BorderLayout());
+            headerObj.setOpaque(false);
             
-            JPanel content = new JPanel(new BorderLayout(0, 10));
-            content.setOpaque(false);
-            content.add(value, BorderLayout.CENTER);
-            
-            JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
+            JLabel titleLabel = new JLabel(title.toUpperCase());
             titleLabel.setForeground(Utils.MUTED);
-            titleLabel.setFont(Utils.FONT);
-            content.add(titleLabel, BorderLayout.SOUTH);
+            titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            titleLabel.setBorder(new EmptyBorder(0, 0, 5, 0));
             
-            card.add(content, BorderLayout.CENTER);
+            JPanel dot = new JPanel();
+            dot.setPreferredSize(new Dimension(8, 8));
+            dot.setBackground(accentColor);
+            dot.setBorder(new EmptyBorder(4, 4, 4, 4)); // Pseudo-rounding
+            
+            headerObj.add(titleLabel, BorderLayout.CENTER);
+            // headerObj.add(dot, BorderLayout.EAST); // Optional dot
+            
+            card.add(headerObj, BorderLayout.NORTH);
+            card.add(value, BorderLayout.CENTER);
+            
+            // Add a subtle bottom border with accent color
+            JPanel bottomBar = new JPanel();
+            bottomBar.setBackground(accentColor);
+            bottomBar.setPreferredSize(new Dimension(0, 3));
+            card.add(bottomBar, BorderLayout.SOUTH);
+            
             return card;
         }
 
@@ -430,19 +619,34 @@ public class AdminPage extends JFrame {
                 lbActive.setText(String.valueOf(active));
                 lbOverdue.setText(String.valueOf(overdue));
 
+                // Dummy data for charts
+                List<String> months = List.of("Jan", "Feb", "Mar", "Apr", "May", "Jun");
+                List<Double> loanData = List.of(12.0, 19.0, 15.0, 25.0, 22.0, 30.0);
+                List<Double> userData = List.of(5.0, 8.0, 15.0, 20.0, 25.0, 35.0);
+                
+                barChart.setData(months, loanData);
+                lineChart.setData(months, userData);
+
                 badgeOverdue = overdue;
                 if (overdue > 0) {
-                    lbOverdue.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(234, 67, 53)),
-                        new EmptyBorder(10, 20, 10, 20)
-                    ));
+                     lbOverdue.setForeground(new Color(234, 67, 53));
+                } else {
+                     lbOverdue.setForeground(Utils.TEXT);
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                ignored.printStackTrace();
+            }
         }
     }
 
+
     class PetugasPanel extends JPanel {
-        DefaultTableModel model = new DefaultTableModel(new String[]{"ID","Username","Nama Lengkap","Gender","Alamat","Telp","Email","Status"},0);
+        DefaultTableModel model = new DefaultTableModel(new String[]{
+            "ID", Lang.get("staff.table.username"), Lang.get("staff.table.name"), 
+            Lang.get("label.gender"), Lang.get("staff.form.address"), 
+            Lang.get("staff.table.phone"), Lang.get("staff.table.email"), 
+            Lang.get("staff.table.status")
+        }, 0);
         JTable table = new JTable(model);
         private JButton btnRefresh;
         private JTextField searchField;
@@ -452,8 +656,8 @@ public class AdminPage extends JFrame {
             setLayout(new BorderLayout());
             
             // Header dengan live search
-            JPanel header = createPanelHeader("Kelola Petugas", 
-                "Tambah, edit, dan kelola akun petugas perpustakaan");
+            JPanel header = createPanelHeader(Lang.get("staff.title"), 
+                Lang.get("staff.subtitle"));
             
             // Table
             styleTable();
@@ -499,7 +703,7 @@ public class AdminPage extends JFrame {
                 BorderFactory.createLineBorder(Utils.BORDER),
                 new EmptyBorder(6, 10, 6, 10)
             ));
-            searchField.putClientProperty("JTextField.placeholderText", "Cari petugas...");
+            searchField.putClientProperty("JTextField.placeholderText", Lang.get("petugas.search.placeholder"));
             
             // Live search listener
             searchField.getDocument().addDocumentListener(new DocumentListener() {
@@ -522,14 +726,14 @@ public class AdminPage extends JFrame {
                 }
             });
             
-            JLabel searchIcon = new JLabel("Cari");
+            JLabel searchIcon = new JLabel(Lang.get("btn.search"));
             searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-             searchIcon.setForeground(Utils.TEXT);
+            searchIcon.setForeground(Utils.TEXT);
             
             searchPanel.add(searchIcon);
             searchPanel.add(searchField);
             
-            btnRefresh = new JButton("Refresh");
+            btnRefresh = new JButton(Lang.get("btn.refresh"));
             btnRefresh.setFont(Utils.FONT);
             btnRefresh.setBackground(Utils.CARD);
             btnRefresh.setForeground(Utils.TEXT);
@@ -594,17 +798,17 @@ public class AdminPage extends JFrame {
             actions.setBackground(Utils.BG);
             actions.setBorder(new EmptyBorder(0, 20, 20, 20));
             
-            JButton add = createPrimaryButton("Tambah Petugas");
-            JButton edit = createSecondaryButton("Edit");
-            JButton activate = createSecondaryButton("Aktifkan");
-            JButton deactivate = createSecondaryButton("Nonaktifkan");
-            JButton reset = createSecondaryButton("Reset Password");
+            JButton add = createPrimaryButton(Lang.get("staff.add_title"));
+            JButton edit = createSecondaryButton(Lang.get("btn.edit"));
+            JButton activate = createSecondaryButton(Lang.get("staff.btn.activate"));
+            JButton deactivate = createSecondaryButton(Lang.get("staff.btn.deactivate"));
+            JButton reset = createSecondaryButton(Lang.get("staff.btn.reset_password"));
             
             add.addActionListener(e -> openForm(null));
             edit.addActionListener(e -> {
                 int r = table.getSelectedRow();
                 if (r < 0) { 
-                    showMessageDialog("Peringatan", "Pilih petugas terlebih dahulu."); 
+                    showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                     return; 
                 }
                 int modelRow = table.convertRowIndexToModel(r);
@@ -633,7 +837,7 @@ public class AdminPage extends JFrame {
             data.put("alamat", String.valueOf(model.getValueAt(row,4)));
             data.put("no_telp", String.valueOf(model.getValueAt(row,5)));
             data.put("email", String.valueOf(model.getValueAt(row,6)));
-            data.put("status_aktif", "Aktif".equals(model.getValueAt(row,7)) ? "1":"0");
+            data.put("status_aktif", Lang.get("staff.status.active").equals(model.getValueAt(row,7)) ? "1":"0");
             return data;
         }
 
@@ -653,10 +857,10 @@ public class AdminPage extends JFrame {
                         r.get("alamat") == null ? "" : r.get("alamat"),
                         r.get("no_telp") == null ? "" : r.get("no_telp"),
                         r.get("email") == null ? "" : r.get("email"),
-                        "1".equals(r.get("status_aktif")) ? "Aktif":"Nonaktif"
+                        "1".equals(r.get("status_aktif")) ? Lang.get("staff.status.active"):Lang.get("staff.status.inactive")
                     });
                 }
-                btnRefresh.setText("Refresh (" + rows.size() + " petugas)");
+                btnRefresh.setText(Lang.get("btn.refresh") + " (" + rows.size() + " " + Lang.get("nav.staff").toLowerCase() + ")");
             } catch (Exception ignored) {
                 ignored.printStackTrace();
             }
@@ -665,7 +869,7 @@ public class AdminPage extends JFrame {
         private void setPetugasStatus(boolean active) {
             int r = table.getSelectedRow();
             if (r < 0) { 
-                showMessageDialog("Peringatan", "Pilih petugas terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -675,28 +879,27 @@ public class AdminPage extends JFrame {
             String currentStatus = String.valueOf(model.getValueAt(modelRow,7));
             
             if ((active && "Aktif".equals(currentStatus)) || (!active && "Nonaktif".equals(currentStatus))) {
-                showMessageDialog("Informasi", "Status sudah sesuai.");
+                showMessageDialog(Lang.get("msg.info"), Lang.get("msg.info"));
                 return;
             }
             
-            String action = active ? "mengaktifkan" : "menonaktifkan";
-            if (!confirmDialog("Konfirmasi", "Apakah Anda yakin ingin " + action + " petugas:\n" + nama + "?")) return;
+            if (!confirmDialog(Lang.get("msg.confirm"), (active ? Lang.get("staff.btn.activate") : Lang.get("staff.btn.deactivate")) + " petugas:\n" + nama + "?")) return;
             
             try {
                 DB.exec("UPDATE users SET status_aktif=? WHERE user_id=? AND role='PETUGAS'", active?1:0, id);
                 DB.audit(Long.valueOf(AdminPage.this.id()), "UPDATE", "users", id, 
                     (active?"Aktifkan":"Nonaktifkan")+" petugas");
                 refresh();
-                showMessageDialog("Sukses", "Status petugas berhasil diperbarui.");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success"));
             } catch (Exception ex) { 
-                showErrorDialog("Error", "Gagal memperbarui status."); 
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error")); 
             }
         }
         
         private void resetPassword() {
             int r = table.getSelectedRow();
             if (r < 0) { 
-                showMessageDialog("Peringatan", "Pilih petugas terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -705,8 +908,8 @@ public class AdminPage extends JFrame {
             String nama = String.valueOf(model.getValueAt(modelRow,2));
             
             String np = JOptionPane.showInputDialog(this, 
-                "Masukkan password baru untuk petugas:\n" + nama, 
-                "Reset Password", 
+                Lang.get("staff.btn.reset_password") + ":\n" + nama, 
+                Lang.get("staff.btn.reset_password"), 
                 JOptionPane.QUESTION_MESSAGE);
             
             if (np == null || np.trim().isEmpty()) return;
@@ -873,7 +1076,12 @@ public class AdminPage extends JFrame {
     }
 
     class AnggotaPanel extends JPanel {
-        DefaultTableModel model = new DefaultTableModel(new String[]{"ID","Username","Nama","Kelas","Gender","Alamat","Telp","Email","Status"},0);
+        DefaultTableModel model = new DefaultTableModel(new String[]{
+            "ID", Lang.get("staff.table.username"), Lang.get("staff.table.name"), 
+            "Kelas", Lang.get("label.gender"), Lang.get("staff.form.address"), 
+            Lang.get("staff.table.phone"), Lang.get("staff.table.email"), 
+            Lang.get("staff.table.status")
+        }, 0);
         JTable table = new JTable(model);
         private JButton btnRefresh;
         private JTextField searchField;
@@ -930,7 +1138,7 @@ public class AdminPage extends JFrame {
                 BorderFactory.createLineBorder(Utils.BORDER),
                 new EmptyBorder(6, 10, 6, 10)
             ));
-            searchField.putClientProperty("JTextField.placeholderText", "Cari anggota...");
+            searchField.putClientProperty("JTextField.placeholderText", Lang.get("petugas.search.placeholder"));
             
             // Live search listener
             searchField.getDocument().addDocumentListener(new DocumentListener() {
@@ -1025,15 +1233,15 @@ public class AdminPage extends JFrame {
             actions.setBackground(Utils.BG);
             actions.setBorder(new EmptyBorder(0, 20, 20, 20));
             
-            JButton edit = createSecondaryButton("Edit");
-            JButton activate = createSecondaryButton("Aktifkan");
-            JButton deactivate = createSecondaryButton("Nonaktifkan");
-            JButton reset = createSecondaryButton("Reset Password");
+            JButton edit = createSecondaryButton(Lang.get("btn.edit"));
+            JButton activate = createSecondaryButton(Lang.get("staff.btn.activate"));
+            JButton deactivate = createSecondaryButton(Lang.get("staff.btn.deactivate"));
+            JButton reset = createSecondaryButton(Lang.get("staff.btn.reset_password"));
             
             edit.addActionListener(e -> {
                 int r = table.getSelectedRow();
                 if (r < 0) { 
-                    showMessageDialog("Peringatan", "Pilih anggota terlebih dahulu."); 
+                    showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                     return; 
                 }
                 int modelRow = table.convertRowIndexToModel(r);
@@ -1106,17 +1314,16 @@ public class AdminPage extends JFrame {
                 return;
             }
             
-            String action = active ? "mengaktifkan" : "menonaktifkan";
-            if (!confirmDialog("Konfirmasi", "Apakah Anda yakin ingin " + action + " anggota:\n" + nama + "?")) return;
+            if (!confirmDialog(Lang.get("msg.confirm"), (active ? Lang.get("staff.btn.activate") : Lang.get("staff.btn.deactivate")) + " anggota:\n" + nama + "?")) return;
             
             try {
                 DB.exec("UPDATE users SET status_aktif=? WHERE user_id=? AND role='USER'", active?1:0, id);
                 DB.audit(Long.valueOf(AdminPage.this.id()), "UPDATE", "users", id, 
                     (active?"Aktifkan":"Nonaktifkan")+" anggota");
                 refresh();
-                showMessageDialog("Sukses", "Status anggota berhasil diperbarui.");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success"));
             } catch (Exception ex) { 
-                showErrorDialog("Error", "Gagal memperbarui status."); 
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error")); 
             }
         }
         
@@ -1132,8 +1339,8 @@ public class AdminPage extends JFrame {
             String nama = String.valueOf(model.getValueAt(modelRow,2));
             
             String np = JOptionPane.showInputDialog(this, 
-                "Masukkan password baru untuk anggota:\n" + nama, 
-                "Reset Password", 
+                Lang.get("staff.btn.reset_password") + ":\n" + nama, 
+                Lang.get("staff.btn.reset_password"), 
                 JOptionPane.QUESTION_MESSAGE);
             
             if (np == null || np.trim().isEmpty()) return;
@@ -1142,9 +1349,9 @@ public class AdminPage extends JFrame {
                 DB.exec("UPDATE users SET password_hash=? WHERE user_id=? AND role='USER'", 
                     Utils.sha256(np), id);
                 DB.audit(Long.valueOf(AdminPage.this.id()), "UPDATE", "users", id, "Reset password anggota");
-                showMessageDialog("Sukses", "Password berhasil direset.");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success"));
             } catch (Exception ex) { 
-                showErrorDialog("Error", "Gagal mereset password."); 
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error")); 
             }
         }
 
@@ -1279,8 +1486,11 @@ public class AdminPage extends JFrame {
 
     class BukuPanel extends JPanel {
         DefaultTableModel model = new DefaultTableModel(new String[]{
-            "ID","Kode","ISBN","Judul","Penulis","Penerbit","Tahun","Kategori","Rak","Stok Total","Stok Tersedia"
-        },0);
+            "ID", "Kode", "ISBN", Lang.get("books.form.title"), Lang.get("books.form.author"), 
+            Lang.get("books.form.publisher"), Lang.get("books.table.year"), 
+            Lang.get("books.table.category"), Lang.get("books.form.location"), 
+            Lang.get("books.table.stock"), Lang.get("books.table.available")
+        }, 0);
         JTable table = new JTable(model);
         private JButton btnRefresh;
         private JTextField searchField;
@@ -1290,8 +1500,8 @@ public class AdminPage extends JFrame {
             setLayout(new BorderLayout());
             
             // Header dengan live search
-            JPanel header = createPanelHeader("Kelola Buku", 
-                "Kelola koleksi buku, kategori, dan rak");
+            JPanel header = createPanelHeader(Lang.get("admin.books.title"), 
+                Lang.get("admin.books.subtitle"));
             
             // Table
             styleTable();
@@ -1438,17 +1648,17 @@ public class AdminPage extends JFrame {
             actions.setBackground(Utils.BG);
             actions.setBorder(new EmptyBorder(0, 20, 20, 20));
             
-            JButton add = createPrimaryButton("Tambah Buku");
-            JButton edit = createSecondaryButton("Edit");
-            JButton delete = createSecondaryButton("Hapus");
-            JButton kategori = createSecondaryButton("Kelola Kategori");
-            JButton rak = createSecondaryButton("Kelola Rak");
+            JButton add = createPrimaryButton(Lang.get("books.add_title"));
+            JButton edit = createSecondaryButton(Lang.get("btn.edit"));
+            JButton delete = createSecondaryButton(Lang.get("btn.delete"));
+            JButton kategori = createSecondaryButton(Lang.get("books.btn.manage_cat"));
+            JButton rak = createSecondaryButton(Lang.get("books.btn.manage_rack"));
             
             add.addActionListener(e -> openForm(null));
             edit.addActionListener(e -> {
                 int r = table.getSelectedRow();
                 if (r < 0) { 
-                    showMessageDialog("Peringatan", "Pilih buku terlebih dahulu."); 
+                    showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                     return; 
                 }
                 int modelRow = table.convertRowIndexToModel(r);
@@ -1542,7 +1752,7 @@ public class AdminPage extends JFrame {
         private void deleteBuku() {
             int r = table.getSelectedRow();
             if (r < 0) { 
-                showMessageDialog("Peringatan", "Pilih buku terlebih dahulu."); 
+                showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.info")); 
                 return; 
             }
             
@@ -1550,18 +1760,18 @@ public class AdminPage extends JFrame {
             String id = String.valueOf(model.getValueAt(modelRow,0));
             String judul = String.valueOf(model.getValueAt(modelRow,3));
             
-            if (!confirmDialog("Konfirmasi Hapus", 
-                "Apakah Anda yakin ingin menghapus buku:\n" + 
-                "Judul: " + judul + "\n\n" +
-                "PERHATIAN: Buku yang sedang dipinjam tidak dapat dihapus!")) return;
+            if (!confirmDialog(Lang.get("btn.delete"), 
+                Lang.get("msg.confirm") + " " + Lang.get("books.form.title") + ":\n" + 
+                judul + "\n\n" +
+                Lang.get("msg.warn_delete_borrowed"))) return;
             
             try {
                 DB.exec("DELETE FROM books WHERE book_id=?", id);
                 DB.audit(Long.valueOf(AdminPage.this.id()), "DELETE", "books", id, "Hapus buku");
                 refresh();
-                showMessageDialog("Sukses", "Buku berhasil dihapus.");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success"));
             } catch (Exception ex) { 
-                showErrorDialog("Error", "Gagal menghapus. Pastikan buku tidak sedang dipinjam."); 
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error")); 
             }
         }
         
@@ -1941,67 +2151,80 @@ public class AdminPage extends JFrame {
             setLayout(new BorderLayout());
             
             // Header dengan live search
-            JPanel header = createPanelHeader("Laporan Peminjaman", 
-                "Lihat dan filter data peminjaman buku");
+            JPanel header = createPanelHeader(Lang.get("admin.laporan.title"), 
+                Lang.get("admin.laporan.subtitle"));
             
-            // Filter panel dengan validasi tanggal
-            JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-            filterPanel.setBackground(Utils.BG);
-            filterPanel.setBorder(new EmptyBorder(0, 20, 10, 20));
-            
-            filterPanel.add(new JLabel("Dari:"));
-            
-            // Validasi input tanggal - hanya angka dan dash
-            from.addKeyListener(new java.awt.event.KeyAdapter() {
-                @Override
-                public void keyTyped(java.awt.event.KeyEvent e) {
-                    char c = e.getKeyChar();
-                    if (!((c >= '0' && c <= '9') || c == '-' || c == '\b')) {
-                        e.consume();
-                    }
+           // Filter panel dengan validasi tanggal
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        filterPanel.setBackground(Utils.BG);
+        filterPanel.setBorder(new EmptyBorder(0, 20, 10, 20));
+        
+        // MODIFIKASI: Mengubah warna label menjadi Utils.TEXT
+        JLabel labelDari = new JLabel("Dari:");
+        labelDari.setForeground(Utils.TEXT);
+        filterPanel.add(labelDari);
+        
+        // MODIFIKASI: Mengatur ukuran textfield
+        from.setPreferredSize(new Dimension(150, 35)); // Lebar 150px, tinggi 30px
+        
+        // Validasi input tanggal - hanya angka dan dash
+        from.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyTyped(java.awt.event.KeyEvent e) {
+                char c = e.getKeyChar();
+                if (!((c >= '0' && c <= '9') || c == '-' || c == '\b')) {
+                    e.consume();
                 }
-            });
-            
-            filterPanel.add(from);
-            filterPanel.add(new JLabel("Sampai:"));
-            
-            to.addKeyListener(new java.awt.event.KeyAdapter() {
-                @Override
-                public void keyTyped(java.awt.event.KeyEvent e) {
-                    char c = e.getKeyChar();
-                    if (!((c >= '0' && c <= '9') || c == '-' || c == '\b')) {
-                        e.consume();
-                    }
+            }
+        });
+        
+        filterPanel.add(from);
+        
+        // MODIFIKASI: Mengubah warna label menjadi Utils.TEXT
+        JLabel labelSampai = new JLabel("Sampai:");
+        labelSampai.setForeground(Utils.TEXT);
+        filterPanel.add(labelSampai);
+        
+        // MODIFIKASI: Mengatur ukuran textfield
+        to.setPreferredSize(new Dimension(150, 35)); // Lebar 150px, tinggi 30px
+        
+        to.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyTyped(java.awt.event.KeyEvent e) {
+                char c = e.getKeyChar();
+                if (!((c >= '0' && c <= '9') || c == '-' || c == '\b')) {
+                    e.consume();
                 }
-            });
-            
-            filterPanel.add(to);
-            
-            JButton filterBtn = createSecondaryButton("Filter");
-            JButton clearBtn = createSecondaryButton("Clear");
-            
-            filterBtn.addActionListener(e -> refresh());
-            clearBtn.addActionListener(e -> { 
-                from.setText(""); 
-                to.setText(""); 
-                refresh(); 
-            });
-            
-            filterPanel.add(filterBtn);
-            filterPanel.add(clearBtn);
-            
-            // Table dengan live search
-            styleTable();
-            JScrollPane scroll = new JScrollPane(table);
-            scroll.setBorder(new EmptyBorder(0, 20, 20, 20));
-            scroll.getViewport().setBackground(Utils.CARD);
-            
-            add(header, BorderLayout.NORTH);
-            add(filterPanel, BorderLayout.CENTER);
-            add(scroll, BorderLayout.SOUTH);
-            
-            refresh();
-        }
+            }
+        });
+        
+        filterPanel.add(to);
+        
+        JButton filterBtn = createSecondaryButton("Filter");
+        JButton clearBtn = createSecondaryButton("Clear");
+        
+        filterBtn.addActionListener(e -> refresh());
+        clearBtn.addActionListener(e -> { 
+            from.setText(""); 
+            to.setText(""); 
+            refresh(); 
+        });
+        
+        filterPanel.add(filterBtn);
+        filterPanel.add(clearBtn);
+        
+        // Table dengan live search
+        styleTable();
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(new EmptyBorder(0, 20, 20, 20));
+        scroll.getViewport().setBackground(Utils.CARD);
+        
+        add(header, BorderLayout.NORTH);
+        add(filterPanel, BorderLayout.CENTER);
+        add(scroll, BorderLayout.SOUTH);
+        
+        refresh();
+    }
         
         private JPanel createPanelHeader(String title, String subtitle) {
             JPanel header = new JPanel(new BorderLayout());
@@ -2031,7 +2254,7 @@ public class AdminPage extends JFrame {
                 BorderFactory.createLineBorder(Utils.BORDER),
                 new EmptyBorder(6, 10, 6, 10)
             ));
-            searchField.putClientProperty("JTextField.placeholderText", "Cari laporan...");
+            searchField.putClientProperty("JTextField.placeholderText", Lang.get("petugas.search.placeholder"));
             
             // Live search listener
             searchField.getDocument().addDocumentListener(new DocumentListener() {
@@ -2208,7 +2431,10 @@ public class AdminPage extends JFrame {
                     else if ("BATAL".equals(status)) batal++;
                 }
                 
-                btnRefresh.setText("🔄 " + total + " laporan (" + aktif + " aktif, " + selesai + " selesai, " + batal + " batal)");
+                btnRefresh.setText("<html><body style='text-align:center'>🔄 " + Lang.get("table.total") + ": <b>" + total + "</b> | " +
+                    "<span style='color:#4285F4'>" + Lang.get("status.active") + ": <b>" + aktif + "</b></span> | " +
+                    "<span style='color:#34A853'>" + Lang.get("status.finished") + ": <b>" + selesai + "</b></span> | " +
+                    "<span style='color:#EA4335'>" + Lang.get("status.cancelled") + ": <b>" + batal + "</b></span></body></html>");
             } catch (Exception ignored) {
                 ignored.printStackTrace();
             }
@@ -2217,67 +2443,275 @@ public class AdminPage extends JFrame {
 
     class SettingsPanel extends JPanel {
         private JTextField libName = Utils.input("nama perpustakaan");
-        private JTextField opHours = Utils.input("operasional");
         private JTextField maxDays = Utils.input("maks hari (angka)");
         private JTextField maxBooks = Utils.input("maks buku (angka)");
         private JTextField fine = Utils.input("denda per hari (angka)");
         private JTextField maxBorrowUser = Utils.input("maks pinjam per user (angka)");
         private JButton btnSave;
+        private JLabel logoPreview;
+        private List<DayRow> scheduleRows = new ArrayList<>();
+
+        class DayRow {
+            int index;
+            JCheckBox open;
+            JSpinner start, end;
+            JPanel panel;
+            
+            DayRow(int idx) {
+                this.index = idx;
+                panel = new JPanel(new GridBagLayout());
+                panel.setOpaque(false);
+                GridBagConstraints gbc = new GridBagConstraints();
+                gbc.insets = new Insets(2, 5, 2, 5);
+                gbc.fill = GridBagConstraints.HORIZONTAL;
+                
+                JLabel nameLabel = new JLabel(Lang.get("day." + idx).toUpperCase());
+                nameLabel.setForeground(Utils.TEXT);
+                nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+                nameLabel.setPreferredSize(new Dimension(85, 25));
+                
+                open = new JCheckBox(Lang.get("label.buka"));
+                open.setForeground(Utils.TEXT);
+                open.setOpaque(false);
+                open.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+                
+                start = createTimeSpinner();
+                end = createTimeSpinner();
+                
+                JLabel separator = new JLabel("-");
+                separator.setForeground(Utils.MUTED);
+                
+                gbc.gridx = 0; gbc.weightx = 0.3;
+                panel.add(nameLabel, gbc);
+                
+                gbc.gridx = 1; gbc.weightx = 0.2;
+                panel.add(open, gbc);
+                
+                gbc.gridx = 2; gbc.weightx = 0.2;
+                panel.add(start, gbc);
+                
+                gbc.gridx = 3; gbc.weightx = 0.05;
+                panel.add(separator, gbc);
+                
+                gbc.gridx = 4; gbc.weightx = 0.2;
+                panel.add(end, gbc);
+                
+                open.addActionListener(e -> toggle(open.isSelected()));
+            }
+            
+            void toggle(boolean active) {
+                start.setEnabled(active);
+                end.setEnabled(active);
+            }
+            
+            private JSpinner createTimeSpinner() {
+                SpinnerDateModel model = new SpinnerDateModel();
+                JSpinner s = new JSpinner(model);
+                JSpinner.DateEditor editor = new JSpinner.DateEditor(s, "HH:mm");
+                s.setEditor(editor);
+                s.setPreferredSize(new Dimension(70, 25));
+                s.setBackground(Utils.CARD2);
+                s.setBorder(BorderFactory.createLineBorder(Utils.BORDER));
+                return s;
+            }
+        }
 
         SettingsPanel() {
             setBackground(Utils.BG);
             setLayout(new BorderLayout());
             
             // Header
-            JPanel header = createPanelHeader("Pengaturan Sistem", 
-                "Konfigurasi aturan dan pengaturan perpustakaan");
+            JPanel header = createPanelHeader(Lang.get("settings.title"), Lang.get("settings.subtitle"));
+            add(header, BorderLayout.NORTH);
             
-            // Settings form
-            JPanel form = new JPanel(new GridLayout(7, 2, 15, 15));
-            form.setBackground(Utils.BG);
-            form.setBorder(new EmptyBorder(20, 20, 20, 20));
+            // Main Content with Bento Grid
+            JPanel content = new JPanel(new GridBagLayout());
+            content.setBackground(Utils.BG);
+            content.setBorder(new EmptyBorder(0, 20, 20, 20));
             
             Utils.numericOnly(maxDays);
             Utils.numericOnly(maxBooks);
             Utils.numericOnly(fine);
             Utils.numericOnly(maxBorrowUser);
             
-            // Labels with icons
-            form.add(createSettingRow(" Nama Perpustakaan", libName));
-            form.add(createSettingRow("Jam Operasional", opHours));
-            form.add(createSettingRow("Maks Hari Pinjam", maxDays));
-            form.add(createSettingRow("Maks Buku per Transaksi", maxBooks));
-            form.add(createSettingRow("Maks Pinjam per User", maxBorrowUser));
-            form.add(createSettingRow("Denda per Hari (Rp)", fine));
+            // 1. Identity Card
+            JPanel identityCard = createBentoCard(Lang.get("settings.card.identity"));
+            identityCard.setLayout(new BorderLayout(15, 15));
             
-            // Buttons
-            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-            buttonPanel.setBackground(Utils.BG);
-            buttonPanel.setBorder(new EmptyBorder(0, 20, 20, 20));
+            JPanel logoPreviewPanel = new JPanel(new BorderLayout(0, 5));
+            logoPreviewPanel.setOpaque(false);
+            logoPreview = new JLabel();
+            logoPreview.setPreferredSize(new Dimension(80, 80));
+            logoPreview.setBorder(BorderFactory.createLineBorder(Utils.BORDER));
+            logoPreview.setHorizontalAlignment(SwingConstants.CENTER);
+            loadLogo();
             
-            btnSave = createPrimaryButton("Simpan Pengaturan");
-            JButton export = createSecondaryButton("Export CSV...");
-            JButton backup = createSecondaryButton("Backup Database");
+            JButton btnChangeLogo = createSecondaryButton(Lang.get("btn.upload"));
+            btnChangeLogo.addActionListener(e -> changeLogo());
+            logoPreviewPanel.add(logoPreview, BorderLayout.CENTER);
+            logoPreviewPanel.add(btnChangeLogo, BorderLayout.SOUTH);
+            
+            JPanel idForm = new JPanel(new GridLayout(1, 1, 0, 10)); // Changed from (2,1)
+            idForm.setOpaque(false);
+            idForm.add(createInputGroup(Lang.get("label.libname"), libName));
+            
+            identityCard.add(logoPreviewPanel, BorderLayout.WEST);
+            identityCard.add(idForm, BorderLayout.CENTER);
+            
+            // 2. Rules Card
+            JPanel rulesCard = createBentoCard(Lang.get("settings.card.rules"));
+            rulesCard.setLayout(new GridLayout(2, 2, 15, 15));
+            rulesCard.add(createInputGroup(Lang.get("label.maxdays"), maxDays));
+            rulesCard.add(createInputGroup(Lang.get("label.maxbooks"), maxBooks));
+            rulesCard.add(createInputGroup(Lang.get("label.maxborrow"), maxBorrowUser));
+            rulesCard.add(createInputGroup(Lang.get("label.fine"), fine));
+            
+            // 3. Operational Schedule Card
+            JPanel scheduleCard = createBentoCard(Lang.get("label.hours"));
+            JPanel scheduleList = new JPanel(new GridLayout(7, 1, 0, 5));
+            scheduleList.setOpaque(false);
+            
+            for (int i = 0; i < 7; i++) {
+                DayRow dr = new DayRow(i);
+                scheduleRows.add(dr);
+                scheduleList.add(dr.panel);
+            }
+            
+            JButton btnSaveSchedule = createPrimaryButton(Lang.get("btn.save_schedule"));
+            btnSaveSchedule.addActionListener(e -> saveSchedule());
+            
+            JPanel scheduleFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            scheduleFooter.setOpaque(false);
+            scheduleFooter.add(btnSaveSchedule);
+            
+            scheduleCard.add(scheduleList, BorderLayout.CENTER);
+            scheduleCard.add(scheduleFooter, BorderLayout.SOUTH);
+            
+            // Actions Card
+            JPanel actionsCard = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+            actionsCard.setBackground(Utils.BG);
+            actionsCard.setBorder(new EmptyBorder(10, 0, 0, 0));
+            
+            btnSave = createPrimaryButton(Lang.get("btn.save"));
+            JButton export = createSecondaryButton(Lang.get("report.generate") + " CSV");
+            JButton backup = createSecondaryButton("Backup DB");
             
             btnSave.addActionListener(e -> saveSettings());
             export.addActionListener(e -> exportCSV());
             backup.addActionListener(e -> backupDatabase());
             
-            buttonPanel.add(btnSave);
-            buttonPanel.add(export);
-            buttonPanel.add(backup);
+            actionsCard.add(backup);
+            actionsCard.add(export);
+            actionsCard.add(btnSave);
             
-            add(header, BorderLayout.NORTH);
-            add(form, BorderLayout.CENTER);
-            add(buttonPanel, BorderLayout.SOUTH);
+            // === Add to GridBag (Compact Layout) ===
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.insets = new Insets(5, 5, 5, 5);
+            gbc.fill = GridBagConstraints.BOTH;
             
+            // Left Column: Identity & Rules
+            gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0.45; gbc.weighty = 0.0;
+            content.add(identityCard, gbc);
+            
+            gbc.gridx = 0; gbc.gridy = 1; gbc.weighty = 0.5;
+            content.add(rulesCard, gbc);
+            
+            // Right Column: Schedule
+            gbc.gridx = 1; gbc.gridy = 0; gbc.gridheight = 2; gbc.weightx = 0.55; gbc.weighty = 1.0;
+            content.add(scheduleCard, gbc);
+            
+            // Bottom Row: Actions
+            gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2; gbc.weighty = 0.0;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            content.add(actionsCard, gbc);
+            
+            add(content, BorderLayout.CENTER);
             refresh();
+        }
+        
+        private void loadLogo() {
+            try {
+                File f = new File("src/nahlib/nahsazlibrary.png");
+                if (f.exists()) {
+                    ImageIcon ic = new ImageIcon(f.getAbsolutePath());
+                    logoPreview.setIcon(new ImageIcon(ic.getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH)));
+                } else {
+                    java.net.URL imgURL = getClass().getResource("/nahlib/nahsazlibrary.png");
+                    if (imgURL != null) {
+                        ImageIcon ic = new ImageIcon(imgURL);
+                        logoPreview.setIcon(new ImageIcon(ic.getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH)));
+                    }
+                }
+            } catch (Exception e) {}
+        }
+        
+        private JPanel createBentoCard(String title) {
+            JPanel card = new JPanel();
+            card.setBackground(Utils.CARD);
+            card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Utils.BORDER),
+                new EmptyBorder(12, 12, 12, 12)
+            ));
+            
+            // Wrap internal content with title
+            JPanel wrapper = new JPanel(new BorderLayout(0, 8));
+            wrapper.setOpaque(false);
+            
+            JLabel lbl = new JLabel(title);
+            lbl.setForeground(Utils.MUTED);
+            lbl.setFont(Utils.FONT_B);
+            
+            wrapper.add(lbl, BorderLayout.NORTH);
+            wrapper.add(card, BorderLayout.CENTER); // Reuse card as container? No, logic twist.
+            
+            // Fix: wrapper is the outer styling? No.
+            // Let's make the card THE panel.
+            card.setLayout(new BorderLayout(0, 15));
+            card.add(lbl, BorderLayout.NORTH);
+            return card;
+        }
+
+        private JPanel createInputGroup(String label, JTextField field) {
+            JPanel p = new JPanel(new BorderLayout(0, 5));
+            p.setOpaque(false);
+            JLabel l = new JLabel(label);
+            l.setForeground(Utils.TEXT);
+            l.setFont(Utils.FONT);
+            p.add(l, BorderLayout.NORTH);
+            p.add(field, BorderLayout.CENTER);
+            return p;
+        }
+
+        private void changeLogo() {
+            // Gunakan FileDialog (AWT) untuk mendapatkan dialog native Windows yang modern
+            FileDialog fd = new FileDialog(AdminPage.this, "Pilih Logo Baru", FileDialog.LOAD);
+            // setFile filter pattern untuk Windows
+            fd.setFile("*.png;*.jpg;*.jpeg"); 
+            fd.setVisible(true);
+
+            if (fd.getFile() != null) {
+                File src = new File(fd.getDirectory(), fd.getFile());
+                String targetPath = "C:\\Users\\briya\\OneDrive\\Dokumen\\MAPEL RPL SMKANTR2\\Projek Akhir RPL2\\Netbeans\\NahLib\\src\\nahlib\\nahsazlibrary.png";
+                Path dest = Paths.get(targetPath);
+                
+                try {
+                    Files.copy(src.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+                    loadLogo(); // Reload preview di settings
+                    AdminPage.this.refreshApp(); // Update logo di top bar (AdminPage)
+                    
+                    showMessageDialog("Sukses", "Logo berhasil diganti!");
+                    DB.audit(Long.valueOf(AdminPage.this.id()), "UPDATE", "system", "logo", "Changed application logo");
+                } catch (Exception ex) {
+                    showErrorDialog("Error", "Gagal mengganti logo: " + ex.getMessage());
+                    ex.printStackTrace();
+                }
+            }
         }
         
         private JPanel createPanelHeader(String title, String subtitle) {
             JPanel header = new JPanel(new BorderLayout());
             header.setBackground(Utils.BG);
-            header.setBorder(new EmptyBorder(20, 20, 20, 20));
+            header.setBorder(new EmptyBorder(20, 20, 10, 20));
             
             JLabel titleLabel = new JLabel(title);
             titleLabel.setForeground(Utils.TEXT);
@@ -2295,36 +2729,56 @@ public class AdminPage extends JFrame {
             header.add(titlePanel, BorderLayout.WEST);
             return header;
         }
-        
-        private JPanel createSettingRow(String label, JTextField field) {
-            JPanel row = new JPanel(new BorderLayout(10, 5));
-            row.setOpaque(false);
-            
-            JLabel lbl = new JLabel(label);
-            lbl.setForeground(Utils.TEXT);
-            lbl.setFont(Utils.FONT);
-            lbl.setPreferredSize(new Dimension(220, 30));
-            
-            row.add(lbl, BorderLayout.WEST);
-            row.add(field, BorderLayout.CENTER);
-            
-            return row;
-        }
 
-        void refresh() {
+        public void refresh() {
             try {
                 var s = DB.settings();
                 libName.setText(s.getOrDefault("library_name","Nahsaz Library"));
-                opHours.setText(s.getOrDefault("operational_hours",""));
+                
                 var r = DB.rules();
                 maxDays.setText(String.valueOf(r.get("max_days")));
                 maxBooks.setText(String.valueOf(r.get("max_books")));
                 fine.setText(String.valueOf(r.get("fine_per_day")));
                 maxBorrowUser.setText(String.valueOf(r.get("max_borrow_per_user")));
-                
-                btnSave.setText("Pengaturan Dimuat");
+
+                // Load Schedule
+                var oh = DB.query("SELECT * FROM operational_hours ORDER BY day_index");
+                SimpleDateFormat parser = new SimpleDateFormat("HH:mm:ss");
+                for (var row : oh) {
+                    int idx = Integer.parseInt(row.get("day_index"));
+                    if (idx < scheduleRows.size()) {
+                        DayRow dr = scheduleRows.get(idx);
+                        dr.open.setSelected("1".equals(row.get("is_open")));
+                        dr.start.setValue(parser.parse(row.get("open_time")));
+                        dr.end.setValue(parser.parse(row.get("close_time")));
+                        dr.toggle(dr.open.isSelected());
+                    }
+                }
             } catch (Exception e) {
+                e.printStackTrace();
                 showErrorDialog("Error", "Gagal memuat pengaturan.");
+            }
+        }
+
+        private void saveSchedule() {
+            try {
+                if (!confirmDialog(Lang.get("btn.save_schedule"), Lang.get("msg.confirm"))) return;
+                
+                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
+                for (DayRow dr : scheduleRows) {
+                    String startStr = sdf.format((Date) dr.start.getValue());
+                    String endStr = sdf.format((Date) dr.end.getValue());
+                    int open = dr.open.isSelected() ? 1 : 0;
+                    
+                    DB.exec("UPDATE operational_hours SET is_open=?, open_time=?, close_time=? WHERE day_index=?",
+                            open, startStr, endStr, dr.index);
+                }
+                
+                DB.audit(Long.valueOf(AdminPage.this.id()), "UPDATE", "operational_hours", "all", "Update operational schedule");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success_save"));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                showErrorDialog(Lang.get("msg.error"), "Gagal menyimpan jadwal: " + ex.getMessage());
             }
         }
         
@@ -2341,35 +2795,25 @@ public class AdminPage extends JFrame {
                     return;
                 }
                 
-                if (!confirmDialog("Konfirmasi", 
-                    "Apakah Anda yakin ingin menyimpan pengaturan?\n\n" +
-                    "Nama Perpustakaan: " + libName.getText().trim() + "\n" +
-                    "Maks Hari: " + d + " hari\n" +
-                    "Maks Buku per Transaksi: " + b + " buku\n" +
-                    "Maks Pinjam per User: " + mu + " buku\n" +
-                    "Denda: Rp " + f + " per hari")) return;
+                if (!confirmDialog("Konfirmasi", "Simpan pengaturan perpustakaan?")) return;
                 
                 DB.exec("UPDATE settings SET setting_value=? WHERE setting_key='library_name'", libName.getText().trim());
-                DB.exec("UPDATE settings SET setting_value=? WHERE setting_key='operational_hours'", opHours.getText().trim());
                 DB.exec("UPDATE rules SET max_days=?, max_books=?, fine_per_day=?, max_borrow_per_user=? WHERE rule_id=1", 
                     d, b, f, mu);
-                 DB.exec("UPDATE settings SET setting_value=? WHERE setting_key='library_name'", 
-                    libName.getText().trim());
 
                 DB.audit(Long.valueOf(AdminPage.this.id()), "UPDATE", "settings", "rules", "Update settings & rules");
-                btnSave.setText("Pengaturan Tersimpan");
-                showMessageDialog("Sukses", "Pengaturan berhasil disimpan.");
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success_save"));
             } catch (NumberFormatException e) {
-                showErrorDialog("Error", "Format angka tidak valid.");
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error"));
             } catch (Exception ex) {
                 ex.printStackTrace();
-                showErrorDialog("Error", "Gagal menyimpan pengaturan: " + ex.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + ex.getMessage());
             }
         }
         
         private void exportCSV() {
             String[] tables = {"users","books","loans","loan_items","returns","wishlist","categories","racks","audit_log"};
-            String pick = (String) JOptionPane.showInputDialog(this, "Pilih tabel untuk export:", "Export CSV",
+            String pick = (String) JOptionPane.showInputDialog(this, Lang.get("report.period") + ":", Lang.get("report.generate") + " CSV",
                     JOptionPane.PLAIN_MESSAGE, null, tables, tables[0]);
             if (pick == null) return;
 
@@ -2380,9 +2824,9 @@ public class AdminPage extends JFrame {
             try {
                 DB.exportTableToCSV(pick, fc.getSelectedFile());
                 DB.audit(Long.valueOf(AdminPage.this.id()), "EXPORT", "csv", pick, "Export CSV");
-                showMessageDialog("Sukses", "Export berhasil: " + fc.getSelectedFile().getName());
+                showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success") + ": " + fc.getSelectedFile().getName());
             } catch (Exception ex) {
-                showErrorDialog("Error", "Export gagal: " + ex.getMessage());
+                showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error") + ": " + ex.getMessage());
             }
         }
         
@@ -2397,10 +2841,10 @@ public class AdminPage extends JFrame {
             
             if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
                 try {
-                    showMessageDialog("Info", "Fitur backup database dalam pengembangan.\n" +
+                    showMessageDialog(Lang.get("msg.info"), Lang.get("msg.info") + "\n" +
                         "Gunakan Export CSV untuk mengekspor data tabel.");
                 } catch (Exception ex) {
-                    showErrorDialog("Error", "Backup gagal.");
+                    showErrorDialog(Lang.get("msg.error"), Lang.get("msg.error"));
                 }
             }
         }
@@ -2419,8 +2863,8 @@ public class AdminPage extends JFrame {
             setLayout(new BorderLayout());
             
             // Header
-            JPanel header = createPanelHeader("Activity Log", 
-                "Riwayat aktivitas sistem");
+            JPanel header = createPanelHeader(Lang.get("admin.audit.title"), 
+                Lang.get("admin.audit.subtitle"));
             
             // Filter tanggal di pojok kanan atas
             JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -2527,7 +2971,7 @@ public class AdminPage extends JFrame {
                 BorderFactory.createLineBorder(Utils.BORDER),
                 new EmptyBorder(6, 10, 6, 10)
             ));
-            searchField.putClientProperty("JTextField.placeholderText", "Cari log...");
+            searchField.putClientProperty("JTextField.placeholderText", Lang.get("petugas.search.placeholder"));
             
             // Live search listener
             searchField.getDocument().addDocumentListener(new DocumentListener() {
@@ -2674,7 +3118,7 @@ public class AdminPage extends JFrame {
                         r.get("action"), r.get("entity"), r.get("entity_id"), r.get("detail")
                     });
                 }
-                btnRefresh.setText("🔄 " + rows.size() + " log");
+                btnRefresh.setText("<html><body>🔄 " + Lang.get("table.total") + ": <b>" + rows.size() + "</b> log</body></html>");
             } catch (Exception ignored) {
                 ignored.printStackTrace();
             }

@@ -5,11 +5,46 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.text.*;
 import java.awt.*;
+import java.awt.geom.Ellipse2D;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import javax.imageio.ImageIO;
 
 public class Utils {
+    public static Image makeCircularImage(Image src, int size) {
+        if (src == null) return null;
+        
+        // Force full load using ImageIcon
+        src = new ImageIcon(src).getImage();
+        int w = src.getWidth(null);
+        int h = src.getHeight(null);
+        
+        // HD Processing: Use at least 2x target size or the original image hardware resolution
+        // to prevent "burik" or pixelated results when scaled.
+        int renderSize = Math.max(size * 2, Math.max(w, h));
+        
+        BufferedImage buffer = new BufferedImage(renderSize, renderSize, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = buffer.createGraphics();
+        
+        // Set Ultra Rendering Hints
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g2.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        
+        // Draw the HD circular version
+        g2.setClip(new Ellipse2D.Double(0, 0, renderSize, renderSize));
+        g2.drawImage(src, 0, 0, renderSize, renderSize, null);
+        g2.dispose();
+        
+        // Final smooth transition to the target size
+        return buffer.getScaledInstance(size, size, Image.SCALE_SMOOTH);
+    }
+    
     // Palette sesuai tema gelap + aksen biru
     public static final Color BG = new Color(0x28,0x2A,0x37);
     public static final Color CARD = new Color(0x30,0x34,0x42);
@@ -23,6 +58,13 @@ public class Utils {
     public static final Font FONT_B = new Font("Segoe UI", Font.BOLD, 13);
     public static final Font H1 = new Font("Segoe UI", Font.BOLD, 22);
     public static final Font H2 = new Font("Segoe UI", Font.BOLD, 16);
+
+    // Padding & Margin constants for consistency
+    public static final int PADDING = 20;
+    public static final int MARGIN = 16;
+    public static final EmptyBorder UI_PADDING = new EmptyBorder(PADDING, PADDING, PADDING, PADDING);
+    public static final EmptyBorder UI_MARGIN = new EmptyBorder(MARGIN, MARGIN, MARGIN, MARGIN);
+    
     private static Component parent;
 
     public static void applyBaseUI() {

@@ -18,6 +18,7 @@ public class DB {
         try {
             if (conn != null && !conn.isClosed()) return conn;
             conn = DriverManager.getConnection(URL, USER, PASS);
+            initOperationalHours();
             return conn;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -238,5 +239,29 @@ public class DB {
     // ====== FUNCTIONAL INTERFACE ======
     public interface RunnableWithException {
         void run() throws Exception;
+    }
+
+    private static void initOperationalHours() {
+        try {
+            // Create table if not exists
+            exec("CREATE TABLE IF NOT EXISTS operational_hours (" +
+                 "day_index INT PRIMARY KEY, " +
+                 "day_name VARCHAR(10), " +
+                 "is_open TINYINT DEFAULT 1, " +
+                 "open_time TIME DEFAULT '08:00:00', " +
+                 "close_time TIME DEFAULT '17:00:00')");
+            
+            // Populate if empty
+            var count = query("SELECT COUNT(*) as total FROM operational_hours").get(0).get("total");
+            if (toInt(count, 0) == 0) {
+                String[] days = {"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"};
+                for (int i = 0; i < days.length; i++) {
+                    exec("INSERT INTO operational_hours (day_index, day_name, is_open, open_time, close_time) " +
+                         "VALUES (?, ?, ?, ?, ?)", i, days[i], (i == 0 ? 0 : 1), "08:00:00", "17:00:00");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
