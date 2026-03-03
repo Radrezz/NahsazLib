@@ -53,11 +53,6 @@ public class Utils {
         
         g2.drawImage(src, dx, dy, dw, dh, null);
         
-        // Optional: Add a subtle border to smooth edges against dark background
-        g2.setStroke(new BasicStroke(renderSize * 0.02f)); // 2% border thickness
-        g2.setColor(new Color(255, 255, 255, 20)); // Faint white border
-        g2.drawOval(0, 0, renderSize, renderSize);
-        
         g2.dispose();
         
         // High quality downscale to final target size
@@ -261,6 +256,17 @@ public class Utils {
         if (path == null || path.isEmpty()) return null;
         try {
             File f = new File(path);
+            
+            // Fallback: Jika tidak ditemukan (kasus beda working directory saat build)
+            if (!f.exists()) {
+                // Coba cek di folder dist (jika run dari NetBeans)
+                f = new File("dist/" + path);
+                if (!f.exists()) {
+                    // Coba cek di folder src (jika di dev environment)
+                    f = new File("src/" + path);
+                }
+            }
+            
             if (!f.exists()) return null;
             BufferedImage img = ImageIO.read(f);
             if (img == null) return null;
@@ -401,15 +407,31 @@ public class Utils {
         try {
             BufferedImage img = null;
             
-            // 1. Try resource (CLASSPATH) - Best for JAR
-            java.net.URL imgURL = Utils.class.getResource("/nahlib/nahsazlibrary.png");
-            if (imgURL != null) {
-                try {
-                    img = ImageIO.read(imgURL);
-                } catch (Exception e) { /* continue */ }
-            } 
-            
-            // 2. Try file system (DEV ENV / FALLBACK)
+            // --- NEW: Dynamic Logo from Database ---
+            try {
+                var settings = DB.settings();
+                String dbLogoPath = settings.get("library_logo");
+                if (dbLogoPath != null && !dbLogoPath.isEmpty()) {
+                    File f = new File(dbLogoPath);
+                    if (f.exists()) {
+                        img = ImageIO.read(f);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Gagal memuat logo dari database: " + e.getMessage());
+            }
+
+            // 1. Try external file system (Manual override next to EXE/JAR)
+            if (img == null) {
+                File externalFile = new File("resources/nahsazlibrary.png");
+                if (externalFile.exists()) {
+                    try {
+                        img = ImageIO.read(externalFile);
+                    } catch (Exception e) {}
+                }
+            }
+
+            // 2. Try file system (DEV ENV fallback)
             if (img == null) {
                 String[] paths = {
                     "src/nahlib/nahsazlibrary.png",
@@ -428,7 +450,17 @@ public class Utils {
                 }
             }
             
-            // 3. Fallback: Generate a placeholder if still null
+            // 3. Fallback to resource (CLASSPATH - Internal JAR default)
+            if (img == null) {
+                java.net.URL imgURL = Utils.class.getResource("/nahlib/nahsazlibrary.png");
+                if (imgURL != null) {
+                    try {
+                        img = ImageIO.read(imgURL);
+                    } catch (Exception e) { /* continue */ }
+                } 
+            }
+            
+            // 4. Fallback: Placeholder
             if (img == null) {
                 img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
                 Graphics2D g = img.createGraphics();
@@ -445,7 +477,7 @@ public class Utils {
                 return new ImageIcon(img);
             }
 
-            // Use the high-quality makeCircularImage utility we already have
+            // High-quality circular rendering
             return new ImageIcon(makeCircularImage(img, size));
 
         } catch (Exception e) {

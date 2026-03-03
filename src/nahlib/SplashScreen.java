@@ -76,21 +76,10 @@ public class SplashScreen extends JFrame {
         JLabel logo = new JLabel();
         logo.setAlignmentX(CENTER_ALIGNMENT);
         try {
-            // Try loading custom logo from file first, then resource
-            // This ensures if user changed logo in settings, splash screen updates too!
-            ImageIcon icon = null;
-            java.io.File f = new java.io.File("src/nahlib/nahsazlibrary.png");
-            if (f.exists()) {
-                icon = new ImageIcon(f.getAbsolutePath());
-                icon.getImage().flush(); // Clear Java's image cache
-            } else {
-                java.net.URL imgURL = getClass().getResource("/nahlib/nahsazlibrary.png");
-                if (imgURL != null) icon = new ImageIcon(imgURL);
-            }
-            
+            // Menggunakan utilitas terpusat agar konsisten dengan database dan settings
+            ImageIcon icon = Utils.getAppLogo(160);
             if (icon != null) {
-                // Pass original image to circular utility with target size
-                logo.setIcon(new ImageIcon(Utils.makeCircularImage(icon.getImage(), 160)));
+                logo.setIcon(icon);
             }
         } catch (Exception e) {}
 

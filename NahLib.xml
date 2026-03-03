@@ -3,7 +3,7 @@
   <dontWrapJar>false</dontWrapJar>
   <headerType>gui</headerType>
   <jar>C:\Users\briya\OneDrive\Dokumen\MAPEL RPL SMKANTR2\Projek Akhir RPL2\Netbeans\NahLib\dist\NahLib.jar</jar>
-  <outfile>C:\Users\briya\OneDrive\Dokumen\MAPEL RPL SMKANTR2\Projek Akhir RPL2\Netbeans\NahLib\dist\NahsazLibrary.exe</outfile>
+  <outfile>C:\Users\briya\OneDrive\Dokumen\MAPEL RPL SMKANTR2\Projek Akhir RPL2\Netbeans\NahLib\dist\NahLib.exe</outfile>
   <errTitle></errTitle>
   <cmdLine></cmdLine>
   <chdir>.</chdir>
@@ -13,7 +13,7 @@
   <stayAlive>false</stayAlive>
   <restartOnCrash>false</restartOnCrash>
   <manifest></manifest>
-  <icon>C:\Users\briya\OneDrive\Gambar\NahsazLibrary Assets\nahsazLib.ico</icon>
+  <icon>C:\Users\briya\OneDrive\Gambar\NahsazLibrary Assets\Logo\nahsazlib.ico</icon>
   <jre>
     <path>%JAVA_HOME%;%PATH%</path>
     <requiresJdk>false</requiresJdk>

@@ -343,6 +343,16 @@ public class DB {
                 exec("ALTER TABLE users ADD COLUMN description TEXT");
             }
 
+            // Check 'library_logo' in 'settings'
+            try {
+                var res = query("SELECT COUNT(*) as total FROM settings WHERE setting_key = 'library_logo'");
+                if (toInt(res.get(0).get("total"), 0) == 0) {
+                    exec("INSERT INTO settings (setting_key, setting_value) VALUES ('library_logo', '')");
+                }
+            } catch (Exception e) {
+                // Table might not exist yet, though usually it does
+            }
+            
             // Check 'description' in 'books'
             try {
                 conn.createStatement().executeQuery("SELECT description FROM books LIMIT 1");

@@ -230,21 +230,7 @@ public class LoginPage extends JFrame {
         
         // Hero Content
         JLabel logoIcon = new JLabel();
-        try {
-            java.io.File f = new java.io.File("src/nahlib/nahsazlibrary.png");
-            Image img = null;
-            if (f.exists()) {
-                ImageIcon ic = new ImageIcon(f.getAbsolutePath());
-                ic.getImage().flush(); // Clear Java's image cache
-                img = ic.getImage();
-            } else {
-                java.net.URL url = getClass().getResource("/nahlib/nahsazlibrary.png");
-                if (url != null) img = new ImageIcon(url).getImage();
-            }
-            if (img != null) {
-                logoIcon.setIcon(new ImageIcon(Utils.makeCircularImage(img, 240)));
-            }
-        } catch (Exception e) {}
+        logoIcon.setIcon(Utils.getAppLogo(240));
         logoIcon.setAlignmentX(CENTER_ALIGNMENT);
         
         JLabel brandNameLabel = new JLabel(Utils.getLibraryName());

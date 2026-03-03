@@ -232,11 +232,10 @@ public class SettingsPanel extends JPanel {
     
     private void loadLogo() {
         try {
-            File f = new File("src/nahlib/nahsazlibrary.png");
-            if (f.exists()) {
-                ImageIcon ic = new ImageIcon(f.getAbsolutePath());
-                ic.getImage().flush();
-                logoPreview.setIcon(new ImageIcon(Utils.makeCircularImage(ic.getImage(), 70)));
+            // Menggunakan utilitas terpusat agar konsisten dengan database
+            ImageIcon icon = Utils.getAppLogo(70);
+            if (icon != null) {
+                logoPreview.setIcon(icon);
             }
         } catch (Exception ignored) {}
     }
@@ -247,14 +246,26 @@ public class SettingsPanel extends JPanel {
         fd.setVisible(true);
         if (fd.getFile() != null) {
             File src = new File(fd.getDirectory(), fd.getFile());
-            String targetPath = "C:\\Users\\briya\\OneDrive\\Dokumen\\MAPEL RPL SMKANTR2\\Projek Akhir RPL2\\Netbeans\\NahLib\\src\\nahlib\\nahsazlibrary.png";
-            Path dest = Paths.get(targetPath);
             try {
-                Files.copy(src.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+                // Buat folder eksternal untuk menyimpan logo
+                File dir = new File("uploads/logo");
+                if (!dir.exists()) dir.mkdirs();
+                
+                String ext = fd.getFile().substring(fd.getFile().lastIndexOf("."));
+                String filename = "app_logo" + ext;
+                File dest = new File(dir, filename);
+                
+                // Copy file ke folder eksternal (di luar EXE/JAR)
+                Files.copy(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                
+                // Simpan PATH RELATIF ke database
+                String relativePath = "uploads/logo/" + filename;
+                DB.exec("UPDATE settings SET setting_value=? WHERE setting_key='library_logo'", relativePath);
+                
                 loadLogo();
                 adminPage.refreshApp();
                 adminPage.showMessageDialog(Lang.get("msg.success"), Lang.get("msg.success"));
-                DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "system", "logo", "Changed application logo");
+                DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "system", "logo", "Changed application logo to " + relativePath);
             } catch (Exception ex) {
                 adminPage.showErrorDialog("Error", "Gagal mengganti logo: " + ex.getMessage());
                 ex.printStackTrace();
