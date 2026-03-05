@@ -17,6 +17,9 @@ public class PeminjamanPanel extends JPanel {
     
     // UI Components
     private JComboBox<Item> cbUser = new JComboBox<>();
+    private JTextField txtGuest = Utils.input(Lang.get("role.user").toLowerCase() + " (guest)");
+    private JCheckBox chkGuest = new JCheckBox(Lang.get("role.user") + " Tamu / Non-Member");
+    private JPanel userCardPanel = new JPanel(new CardLayout());
     private JComboBox<Item> cbBook = new JComboBox<>();
     private JTextField qty = Utils.input(Lang.get("petugas.loan.qty").toLowerCase());
     
@@ -64,20 +67,33 @@ public class PeminjamanPanel extends JPanel {
         styleCombo(cbBook);
         Utils.numericOnly(qty);
 
-        setupSearchableCombo(cbUser, originalUsers);
-        setupSearchableCombo(cbBook, originalBooks);
+        chkGuest.setOpaque(false);
+        chkGuest.setForeground(Utils.TEXT);
+        chkGuest.setFont(Utils.FONT);
+        
+        userCardPanel.setOpaque(false);
+        userCardPanel.add(cbUser, "member");
+        userCardPanel.add(txtGuest, "guest");
+        
+        chkGuest.addActionListener(e -> {
+            CardLayout cl = (CardLayout) userCardPanel.getLayout();
+            cl.show(userCardPanel, chkGuest.isSelected() ? "guest" : "member");
+        });
 
         gbc.gridy = 0;
-        formCard.add(createInputGroup(Lang.get("petugas.loan.select_member"), cbUser), gbc);
-        
+        formCard.add(chkGuest, gbc);
+
         gbc.gridy = 1;
-        formCard.add(createInputGroup(Lang.get("petugas.loan.select_book"), cbBook), gbc);
+        formCard.add(createInputGroup(Lang.get("petugas.loan.select_member"), userCardPanel), gbc);
         
         gbc.gridy = 2;
+        formCard.add(createInputGroup(Lang.get("petugas.loan.select_book"), cbBook), gbc);
+        
+        gbc.gridy = 3;
         formCard.add(createInputGroup(Lang.get("petugas.loan.qty"), qty), gbc);
         
         // Preview
-        gbc.gridy = 3;
+        gbc.gridy = 4;
         gbc.insets = new Insets(5, 0, 20, 0);
         coverPreview.setHorizontalAlignment(SwingConstants.CENTER);
         coverPreview.setPreferredSize(new Dimension(120, 180));
@@ -88,7 +104,7 @@ public class PeminjamanPanel extends JPanel {
         formCard.add(coverWrap, gbc);
 
         // Buttons
-        gbc.gridy = 4;
+        gbc.gridy = 5;
         gbc.insets = new Insets(0, 0, 15, 0);
         JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         buttonRow.setOpaque(false);
@@ -170,6 +186,9 @@ public class PeminjamanPanel extends JPanel {
     }
 
     private boolean isItemSelected(JComboBox<Item> cb) {
+        if (cb == cbUser && chkGuest.isSelected()) {
+            return !txtGuest.getText().trim().isEmpty();
+        }
         Object selected = cb.getSelectedItem();
         return (selected instanceof Item) && ((Item)selected).id != null;
     }
@@ -547,10 +566,21 @@ public class PeminjamanPanel extends JPanel {
 
     void submitLoan() {
         if (!isItemSelected(cbUser)) {
-            petugasPage.showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.select_member"));
+            petugasPage.showMessageDialog(Lang.get("msg.warning"), 
+                chkGuest.isSelected() ? Lang.get("msg.invalid_name") : Lang.get("msg.select_member"));
             return;
         }
-        Item u = (Item) cbUser.getSelectedItem();
+        
+        final String borrowerName;
+        final Integer userId;
+        if (chkGuest.isSelected()) {
+            borrowerName = txtGuest.getText().trim();
+            userId = null;
+        } else {
+            Item u = (Item) cbUser.getSelectedItem();
+            userId = Integer.parseInt(u.id);
+            borrowerName = u.name;
+        }
         
         if (cart.getRowCount() == 0) { 
             petugasPage.showMessageDialog(Lang.get("msg.warning"), Lang.get("msg.no_data")); 
@@ -574,7 +604,7 @@ public class PeminjamanPanel extends JPanel {
 
             // Confirmation dialog with details
             StringBuilder details = new StringBuilder();
-            details.append(Lang.get("role.user")).append(": ").append(u.name).append("\n");
+            details.append(Lang.get("role.user")).append(": ").append(borrowerName).append("\n");
             details.append(Lang.get("table.total")).append(": ").append(totalQty).append("\n");
             details.append(Lang.get("loan.table.duedate")).append(": ").append(maxDays).append(" ").append(Lang.get("nav.history").toLowerCase()).append("\n\n");
             details.append(Lang.get("petugas.return.book_list")).append(":\n");
@@ -602,9 +632,10 @@ public class PeminjamanPanel extends JPanel {
                 }
 
                 long loanId = DB.exec(
-                    "INSERT INTO loans(user_id, petugas_id, tanggal_pinjam, jatuh_tempo, status) " +
-                    "VALUES (?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL ? DAY), 'AKTIF')",
-                    Integer.parseInt(u.id), Integer.parseInt(petugasPage.getMe().get("user_id")), maxDays
+                    "INSERT INTO loans(user_id, guest_name, petugas_id, tanggal_pinjam, jatuh_tempo, status) " +
+                    "VALUES (?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL ? DAY), 'AKTIF')",
+                    userId, chkGuest.isSelected() ? borrowerName : null, 
+                    Integer.parseInt(petugasPage.getMe().get("user_id")), maxDays
                 );
 
                 for (int i = 0; i < cart.getRowCount(); i++) {
@@ -622,7 +653,7 @@ public class PeminjamanPanel extends JPanel {
                 }
 
                 DB.audit(Long.parseLong(petugasPage.getMe().get("user_id")), "CREATE", "loans", 
-                    String.valueOf(loanId), "Peminjaman baru untuk " + u.name);
+                    String.valueOf(loanId), "Peminjaman baru untuk " + borrowerName);
             });
 
             petugasPage.showMessageDialog(Lang.get("msg.success"), Lang.get("loan.msg.success"));

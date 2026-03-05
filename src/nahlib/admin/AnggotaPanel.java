@@ -21,7 +21,7 @@ public class AnggotaPanel extends JPanel {
         "ID", Lang.get("staff.table.username"), Lang.get("staff.table.name"), 
         "Kelas", Lang.get("label.gender"), Lang.get("staff.form.address"), 
         Lang.get("staff.table.phone"), Lang.get("staff.table.email"), 
-        Lang.get("staff.table.status"), Lang.get("btn.view_detail"), "description"
+        Lang.get("staff.table.status"), Lang.get("btn.view_detail"), "description", "req_id", "req_hash"
     }, 0);
     private final JTable table = new JTable(model);
     private JTextField searchField;
@@ -43,10 +43,13 @@ public class AnggotaPanel extends JPanel {
             new nahlib.DetailPage(adminPage, Lang.get("member.title"), getRowData(modelRow));
         }).install(table, 9);
         
-        // Hide description column
+        // Hide meta columns
         table.getColumnModel().getColumn(10).setMinWidth(0);
         table.getColumnModel().getColumn(10).setMaxWidth(0);
-        table.getColumnModel().getColumn(10).setPreferredWidth(0);
+        table.getColumnModel().getColumn(11).setMinWidth(0);
+        table.getColumnModel().getColumn(11).setMaxWidth(0);
+        table.getColumnModel().getColumn(12).setMinWidth(0);
+        table.getColumnModel().getColumn(12).setMaxWidth(0);
         
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(new EmptyBorder(0, 20, 20, 20));
@@ -168,6 +171,12 @@ public class AnggotaPanel extends JPanel {
                     } else if ("Nonaktif".equals(value)) {
                         setForeground(new Color(234, 67, 53));
                     }
+                } else if (column == 1) { // Username column
+                    Object rid = table.getValueAt(row, 11);
+                    if (rid != null && !rid.toString().isEmpty()) {
+                        setForeground(new Color(251, 188, 5)); // Yellow for requests
+                        setFont(getFont().deriveFont(Font.BOLD));
+                    }
                 }
                 
                 setBorder(noFocusBorder);
@@ -184,11 +193,17 @@ public class AnggotaPanel extends JPanel {
         actions.setBackground(Utils.BG);
         actions.setBorder(new EmptyBorder(0, 20, 20, 20));
         
+        JButton add = adminPage.createPrimaryButton(Lang.get("btn.add"));
         JButton edit = adminPage.createSecondaryButton(Lang.get("btn.edit"));
         JButton activate = adminPage.createSecondaryButton(Lang.get("staff.btn.activate"));
         JButton deactivate = adminPage.createSecondaryButton(Lang.get("staff.btn.deactivate"));
         JButton reset = adminPage.createSecondaryButton(Lang.get("staff.btn.reset_password"));
         
+        JButton approveReq = adminPage.createPrimaryButton("Setujui Sandi (!)");
+        approveReq.setBackground(new Color(52, 168, 83));
+        approveReq.setVisible(false);
+        
+        add.addActionListener(e -> openForm(null));
         edit.addActionListener(e -> {
             int r = table.getSelectedRow();
             if (r < 0) { 
@@ -202,11 +217,27 @@ public class AnggotaPanel extends JPanel {
         activate.addActionListener(e -> setAnggotaStatus(true));
         deactivate.addActionListener(e -> setAnggotaStatus(false));
         reset.addActionListener(e -> resetPassword());
+        approveReq.addActionListener(e -> processPasswordRequest());
         
+        table.getSelectionModel().addListSelectionListener(e -> {
+            int r = table.getSelectedRow();
+            if (r >= 0) {
+                int mr = table.convertRowIndexToModel(r);
+                Object rid = model.getValueAt(mr, 11);
+                approveReq.setVisible(rid != null && !rid.toString().isEmpty());
+            } else {
+                approveReq.setVisible(false);
+            }
+            actions.revalidate();
+            actions.repaint();
+        });
+
+        actions.add(add);
         actions.add(edit);
         actions.add(activate);
         actions.add(deactivate);
         actions.add(reset);
+        actions.add(approveReq);
         
         return actions;
     }
@@ -230,10 +261,14 @@ public class AnggotaPanel extends JPanel {
         try {
             model.setRowCount(0);
             var rows = DB.query(
-                "SELECT user_id,username,nama_lengkap,kelas,gender,alamat,no_telp,email,status_aktif,description " +
-                "FROM users WHERE role='USER' ORDER BY user_id DESC"
+                "SELECT u.*, pr.request_id, pr.new_password_hash " +
+                "FROM users u " +
+                "LEFT JOIN password_requests pr ON u.user_id = pr.user_id AND pr.status = 'PENDING' " +
+                "WHERE u.role='USER' ORDER BY u.user_id DESC"
             );
+            int pendingCount = 0;
             for (var r: rows) {
+                if (r.get("request_id") != null) pendingCount++;
                 model.addRow(new Object[]{
                     r.get("user_id"), 
                     r.get("username"), 
@@ -244,11 +279,14 @@ public class AnggotaPanel extends JPanel {
                     r.get("no_telp") == null ? "" : r.get("no_telp"),
                     r.get("email") == null ? "" : r.get("email"),
                     "1".equals(r.get("status_aktif")) ? "Aktif":"Nonaktif",
-                    "1".equals(r.get("status_aktif")) ? "Aktif":"Nonaktif",
                     "", // Button placeholder
-                    r.get("description") == null ? "" : r.get("description")
+                    r.get("description") == null ? "" : r.get("description"),
+                    r.get("request_id"),
+                    r.get("new_password_hash")
                 });
             }
+            
+            adminPage.updateNavBadge(2, pendingCount); // 2 is Members (indexed)
             
             // Update statistics
             int aktif = 0, nonaktif = 0;
@@ -324,8 +362,8 @@ public class AnggotaPanel extends JPanel {
 
     public void openForm(Map<String,String> data) {
         JDialog d = new JDialog(adminPage, true);
-        d.setTitle("Edit Data Anggota");
-        d.setSize(550, 700); // Increased height for description
+        d.setTitle(data == null ? "Tambah Anggota Baru" : "Edit Data Anggota");
+        d.setSize(550, 750); // Increased height for password and description
         d.setLocationRelativeTo(this);
         d.getContentPane().setBackground(Utils.BG);
 
@@ -339,15 +377,16 @@ public class AnggotaPanel extends JPanel {
         panel.setBackground(Utils.BG);
         panel.setBorder(new EmptyBorder(20, 20, 20, 20));
         
-        JLabel title = new JLabel("Edit Data Anggota");
+        JLabel title = new JLabel(data == null ? "Tambah Anggota Baru" : "Edit Data Anggota");
         title.setForeground(Utils.TEXT);
         title.setFont(new Font("Segoe UI", Font.BOLD, 18));
         title.setBorder(new EmptyBorder(0, 0, 20, 0));
         
-        JPanel fields = new JPanel(new GridLayout(8, 1, 10, 15)); // Increased row count
+        JPanel fields = new JPanel(new GridLayout(9, 1, 10, 15)); // Increased row count for password
         fields.setOpaque(false);
         
         JTextField u = Utils.input("username");
+        JPasswordField pw = Utils.passInput("password (isi jika tambah/reset)");
         JTextField nama = Utils.input("nama lengkap");
         
         // Create class combo box
@@ -389,30 +428,33 @@ public class AnggotaPanel extends JPanel {
         descScroll.getViewport().setOpaque(false);
         descScroll.setOpaque(false);
         
-        u.setText(data.get("username"));
-        nama.setText(data.get("nama_lengkap"));
-        
-        // Set selected class
-        if (data.get("kelas") != null && !data.get("kelas").isEmpty()) {
-            kelasCombo.setSelectedItem(data.get("kelas"));
-        }
-        
-        telp.setText(data.get("no_telp"));
-        
-        if (data.get("gender") != null) {
-            genderCombo.setSelectedItem(data.get("gender"));
-        }
-        if (data.get("alamat") != null) {
-            alamat.setText(data.get("alamat"));
-        }
-        if (data.get("email") != null) {
-            email.setText(data.get("email"));
-        }
-        if (data.get("description") != null) {
-            descArea.setText(data.get("description"));
+        if (data != null) {
+            u.setText(data.get("username"));
+            nama.setText(data.get("nama_lengkap"));
+            
+            // Set selected class
+            if (data.get("kelas") != null && !data.get("kelas").isEmpty()) {
+                kelasCombo.setSelectedItem(data.get("kelas"));
+            }
+            
+            telp.setText(data.get("no_telp"));
+            
+            if (data.get("gender") != null) {
+                genderCombo.setSelectedItem(data.get("gender"));
+            }
+            if (data.get("alamat") != null) {
+                alamat.setText(data.get("alamat"));
+            }
+            if (data.get("email") != null) {
+                email.setText(data.get("email"));
+            }
+            if (data.get("description") != null) {
+                descArea.setText(data.get("description"));
+            }
         }
         
         fields.add(createFormRow("Username*", u));
+        fields.add(createFormRow("Password", pw));
         fields.add(createFormRow("Nama Lengkap*", nama));
         fields.add(createFormRow("Kelas", kelasCombo));
         fields.add(createFormRow("Gender", genderCombo));
@@ -425,10 +467,10 @@ public class AnggotaPanel extends JPanel {
         buttons.setOpaque(false);
         
         JButton cancel = adminPage.createSecondaryButton("Batal");
-        JButton save = adminPage.createPrimaryButton("Update");
+        JButton save = adminPage.createPrimaryButton(data == null ? "Simpan" : "Update");
         
         cancel.addActionListener(e -> dialog.dispose());
-        save.addActionListener(e -> saveAnggota(data, u, nama, kelasCombo, genderCombo, alamat, telp, email, descArea, dialog));
+        save.addActionListener(e -> saveAnggota(data, u, pw, nama, kelasCombo, genderCombo, alamat, telp, email, descArea, dialog));
         
         buttons.add(cancel);
         buttons.add(save);
@@ -455,7 +497,7 @@ public class AnggotaPanel extends JPanel {
         return row;
     }
     
-    private void saveAnggota(Map<String,String> data, JTextField u, JTextField nama, 
+    private void saveAnggota(Map<String,String> data, JTextField u, JPasswordField pw, JTextField nama, 
                             JComboBox<String> kelasCombo, JComboBox<String> genderCombo,
                             JTextField alamat, JTextField telp, JTextField email, JTextArea desc, JDialog dialog) {
         try {
@@ -470,24 +512,95 @@ public class AnggotaPanel extends JPanel {
             String kelasValue = kelasCombo.getSelectedItem() != null ? 
                                kelasCombo.getSelectedItem().toString().trim() : "";
             
-            DB.exec("UPDATE users SET username=?, nama_lengkap=?, kelas=?, gender=?, alamat=?, no_telp=?, email=?, description=? WHERE user_id=? AND role='USER'",
-                u.getText().trim(), 
-                nama.getText().trim(), 
-                kelasValue.isEmpty() ? null : kelasValue,
-                gender.isEmpty() ? null : gender,
-                alamat.getText().trim().isEmpty() ? null : alamat.getText().trim(),
-                telp.getText().trim().isEmpty() ? null : telp.getText().trim(),
-                email.getText().trim().isEmpty() ? null : email.getText().trim(),
-                desc.getText().trim(),
-                data.get("user_id")
-            );
-            DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "users", data.get("user_id"), "Edit anggota");
-            adminPage.showMessageDialog(Lang.get("msg.success"), "Data anggota berhasil diperbarui.");
+            if (data == null) {
+                // INSERT Mode
+                if (new String(pw.getPassword()).isEmpty()) {
+                    adminPage.showMessageDialog("Peringatan", "Password wajib untuk anggota baru.");
+                    return;
+                }
+                
+                long idNew = DB.exec(
+                    "INSERT INTO users(username, password_hash, role, nama_lengkap, kelas, gender, alamat, no_telp, email, status_aktif, description) " +
+                    "VALUES (?, ?, 'USER', ?, ?, ?, ?, ?, ?, 1, ?)",
+                    u.getText().trim(),
+                    Utils.sha256(new String(pw.getPassword())),
+                    nama.getText().trim(),
+                    kelasValue.isEmpty() ? null : kelasValue,
+                    gender.isEmpty() ? null : gender,
+                    alamat.getText().trim().isEmpty() ? null : alamat.getText().trim(),
+                    telp.getText().trim().isEmpty() ? null : telp.getText().trim(),
+                    email.getText().trim().isEmpty() ? null : email.getText().trim(),
+                    desc.getText().trim()
+                );
+                
+                // Get the generated ID
+                String lastId = DB.query("SELECT LAST_INSERT_ID() as id").get(0).get("id");
+                
+                DB.audit(Long.valueOf(adminPage.idValue()), "CREATE", "users", lastId, "Tambah anggota");
+                adminPage.showMessageDialog(Lang.get("msg.success"), "Anggota baru berhasil ditambahkan.");
+            } else {
+                // UPDATE Mode
+                DB.exec("UPDATE users SET username=?, nama_lengkap=?, kelas=?, gender=?, alamat=?, no_telp=?, email=?, description=? WHERE user_id=? AND role='USER'",
+                    u.getText().trim(), 
+                    nama.getText().trim(), 
+                    kelasValue.isEmpty() ? null : kelasValue,
+                    gender.isEmpty() ? null : gender,
+                    alamat.getText().trim().isEmpty() ? null : alamat.getText().trim(),
+                    telp.getText().trim().isEmpty() ? null : telp.getText().trim(),
+                    email.getText().trim().isEmpty() ? null : email.getText().trim(),
+                    desc.getText().trim(),
+                    data.get("user_id")
+                );
+                
+                if (!new String(pw.getPassword()).isEmpty()) {
+                    DB.exec("UPDATE users SET password_hash=? WHERE user_id=? AND role='USER'", 
+                        Utils.sha256(new String(pw.getPassword())), data.get("user_id"));
+                }
+                
+                DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "users", data.get("user_id"), "Edit anggota");
+                adminPage.showMessageDialog(Lang.get("msg.success"), "Data anggota berhasil diperbarui.");
+            }
             refresh();
             dialog.dispose();
         } catch (Exception ex) {
             ex.printStackTrace();
             adminPage.showErrorDialog("Error", "Gagal menyimpan. Username mungkin sudah digunakan.");
+        }
+    }
+
+    private void processPasswordRequest() {
+        int r = table.getSelectedRow();
+        if (r < 0) return;
+        
+        int modelRow = table.convertRowIndexToModel(r);
+        String rid = String.valueOf(model.getValueAt(modelRow, 11));
+        String hash = String.valueOf(model.getValueAt(modelRow, 12));
+        String uid = String.valueOf(model.getValueAt(modelRow, 0));
+        String nama = String.valueOf(model.getValueAt(modelRow, 2));
+
+        int opt = JOptionPane.showOptionDialog(this, 
+            "Proses permintaan sandi baru untuk: " + nama + "?",
+            "Konfirmasi Permintaan Sandi",
+            JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null,
+            new String[]{"Setujui", "Tolak", "Batal"}, "Setujui");
+
+        try {
+            if (opt == 0) { // Setujui
+                DB.tx(() -> {
+                    DB.exec("UPDATE users SET password_hash=? WHERE user_id=?", hash, uid);
+                    DB.exec("UPDATE password_requests SET status='APPROVED' WHERE request_id=?", rid);
+                });
+                DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "users", uid, "Setujui permintaan sandi");
+                adminPage.showMessageDialog("Sukses", "Password baru telah diterapkan.");
+            } else if (opt == 1) { // Tolak
+                DB.exec("UPDATE password_requests SET status='REJECTED' WHERE request_id=?", rid);
+                DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "users", uid, "Tolak permintaan sandi");
+                adminPage.showMessageDialog("Info", "Permintaan ditolak.");
+            }
+            refresh();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            adminPage.showErrorDialog("Error", "Gagal memproses permintaan.");
         }
     }
 }

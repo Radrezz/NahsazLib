@@ -279,14 +279,16 @@ public class LaporanSayaPanel extends JPanel {
 
             String sQuery = search.getText().trim();
             if (!sQuery.isEmpty()) {
-                where.append(" AND (l.loan_id LIKE ? OR u.nama_lengkap LIKE ?)");
+                where.append(" AND (l.loan_id LIKE ? OR u.nama_lengkap LIKE ? OR l.guest_name LIKE ?)");
+                params.add("%" + sQuery + "%");
                 params.add("%" + sQuery + "%");
                 params.add("%" + sQuery + "%");
             }
 
-            String sql = "SELECT l.loan_id, l.tanggal_pinjam, l.jatuh_tempo, u.nama_lengkap as anggota, l.status, " +
+            String sql = "SELECT l.loan_id, l.tanggal_pinjam, l.jatuh_tempo, " +
+                       "IFNULL(u.nama_lengkap, l.guest_name) as anggota, l.status, " +
                        "(SELECT SUM(qty) FROM loan_items li WHERE li.loan_id = l.loan_id) as total_item " +
-                       "FROM loans l JOIN users u ON l.user_id = u.user_id " +
+                       "FROM loans l LEFT JOIN users u ON l.user_id = u.user_id " +
                        where.toString() + " ORDER BY l.loan_id DESC";
 
             List<Map<String, String>> rows = DB.query(sql, params.toArray());

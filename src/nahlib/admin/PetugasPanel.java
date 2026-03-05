@@ -21,7 +21,7 @@ public class PetugasPanel extends JPanel {
         "ID", Lang.get("staff.table.username"), Lang.get("staff.table.name"), 
         "Role", Lang.get("label.gender"), Lang.get("staff.form.address"), 
         Lang.get("staff.table.phone"), Lang.get("staff.table.email"), 
-        Lang.get("staff.table.status"), Lang.get("btn.view_detail"), "description"
+        Lang.get("staff.table.status"), Lang.get("btn.view_detail"), "description", "req_id", "req_hash"
     }, 0);
     private final JTable table = new JTable(model);
     private JTextField searchField;
@@ -43,10 +43,13 @@ public class PetugasPanel extends JPanel {
             new nahlib.DetailPage(adminPage, Lang.get("staff.title"), getRowData(modelRow));
         }).install(table, 9);
         
-        // Hide description column
+        // Hide meta columns
         table.getColumnModel().getColumn(10).setMinWidth(0);
         table.getColumnModel().getColumn(10).setMaxWidth(0);
-        table.getColumnModel().getColumn(10).setPreferredWidth(0);
+        table.getColumnModel().getColumn(11).setMinWidth(0);
+        table.getColumnModel().getColumn(11).setMaxWidth(0);
+        table.getColumnModel().getColumn(12).setMinWidth(0);
+        table.getColumnModel().getColumn(12).setMaxWidth(0);
         
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(new EmptyBorder(0, 20, 20, 20));
@@ -171,6 +174,12 @@ public class PetugasPanel extends JPanel {
                 } else if (column == 3) { // Role column
                     if ("ADMIN".equals(value)) setForeground(Utils.ACCENT);
                     else setForeground(Utils.TEXT);
+                } else if (column == 1) { // Username column
+                    Object rid = table.getValueAt(row, 11);
+                    if (rid != null && !rid.toString().isEmpty()) {
+                        setForeground(new Color(251, 188, 5)); // Yellow for requests
+                        setFont(getFont().deriveFont(Font.BOLD));
+                    }
                 }
                 
                 setBorder(noFocusBorder);
@@ -193,6 +202,10 @@ public class PetugasPanel extends JPanel {
         JButton deactivate = adminPage.createSecondaryButton(Lang.get("staff.btn.deactivate"));
         JButton reset = adminPage.createSecondaryButton(Lang.get("staff.btn.reset_password"));
         
+        JButton approveReq = adminPage.createPrimaryButton("Setujui Sandi (!)");
+        approveReq.setBackground(new Color(52, 168, 83));
+        approveReq.setVisible(false);
+        
         add.addActionListener(e -> openForm(null));
         edit.addActionListener(e -> {
             int r = table.getSelectedRow();
@@ -207,12 +220,27 @@ public class PetugasPanel extends JPanel {
         activate.addActionListener(e -> setPetugasStatus(true));
         deactivate.addActionListener(e -> setPetugasStatus(false));
         reset.addActionListener(e -> resetPassword());
+        approveReq.addActionListener(e -> processPasswordRequest());
+        
+        table.getSelectionModel().addListSelectionListener(e -> {
+            int r = table.getSelectedRow();
+            if (r >= 0) {
+                int mr = table.convertRowIndexToModel(r);
+                Object rid = model.getValueAt(mr, 11);
+                approveReq.setVisible(rid != null && !rid.toString().isEmpty());
+            } else {
+                approveReq.setVisible(false);
+            }
+            actions.revalidate();
+            actions.repaint();
+        });
         
         actions.add(add);
         actions.add(edit);
         actions.add(activate);
         actions.add(deactivate);
         actions.add(reset);
+        actions.add(approveReq);
         
         return actions;
     }
@@ -235,10 +263,14 @@ public class PetugasPanel extends JPanel {
         try {
             model.setRowCount(0);
             var rows = DB.query(
-                "SELECT user_id,username,nama_lengkap,role,gender,alamat,no_telp,email,status_aktif,description " +
-                "FROM users WHERE role IN ('PETUGAS','ADMIN') ORDER BY role ASC, user_id DESC"
+                "SELECT u.*, pr.request_id, pr.new_password_hash " +
+                "FROM users u " +
+                "LEFT JOIN password_requests pr ON u.user_id = pr.user_id AND pr.status = 'PENDING' " +
+                "WHERE u.role IN ('PETUGAS','ADMIN') ORDER BY u.role ASC, u.user_id DESC"
             );
+            int pendingCount = 0;
             for (var r: rows) {
+                if (r.get("request_id") != null) pendingCount++;
                 model.addRow(new Object[]{
                     r.get("user_id"), 
                     r.get("username"), 
@@ -250,9 +282,13 @@ public class PetugasPanel extends JPanel {
                     r.get("email") == null ? "" : r.get("email"),
                     "1".equals(r.get("status_aktif")) ? Lang.get("staff.status.active"):Lang.get("staff.status.inactive"),
                     "", // Button placeholder
-                    r.get("description") == null ? "" : r.get("description")
+                    r.get("description") == null ? "" : r.get("description"),
+                    r.get("request_id"),
+                    r.get("new_password_hash")
                 });
             }
+            
+            adminPage.updateNavBadge(1, pendingCount); // 1 is Staff (indexed)
             
             // Update statistics
             int aktif = 0, nonaktif = 0;
@@ -511,6 +547,42 @@ public class PetugasPanel extends JPanel {
         } catch (Exception ex) {
             ex.printStackTrace();
             adminPage.showErrorDialog("Error", "Gagal menyimpan. Username mungkin sudah digunakan.");
+        }
+    }
+
+    private void processPasswordRequest() {
+        int r = table.getSelectedRow();
+        if (r < 0) return;
+        
+        int modelRow = table.convertRowIndexToModel(r);
+        String rid = String.valueOf(model.getValueAt(modelRow, 11));
+        String hash = String.valueOf(model.getValueAt(modelRow, 12));
+        String uid = String.valueOf(model.getValueAt(modelRow, 0));
+        String nama = String.valueOf(model.getValueAt(modelRow, 2));
+
+        int opt = JOptionPane.showOptionDialog(this, 
+            "Proses permintaan sandi baru untuk: " + nama + "?",
+            "Konfirmasi Permintaan Sandi",
+            JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null,
+            new String[]{"Setujui", "Tolak", "Batal"}, "Setujui");
+
+        try {
+            if (opt == 0) { // Setujui
+                DB.tx(() -> {
+                    DB.exec("UPDATE users SET password_hash=? WHERE user_id=?", hash, uid);
+                    DB.exec("UPDATE password_requests SET status='APPROVED' WHERE request_id=?", rid);
+                });
+                DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "users", uid, "Setujui permintaan sandi");
+                adminPage.showMessageDialog("Sukses", "Password baru telah diterapkan.");
+            } else if (opt == 1) { // Tolak
+                DB.exec("UPDATE password_requests SET status='REJECTED' WHERE request_id=?", rid);
+                DB.audit(Long.valueOf(adminPage.idValue()), "UPDATE", "users", uid, "Tolak permintaan sandi");
+                adminPage.showMessageDialog("Info", "Permintaan ditolak.");
+            }
+            refresh();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            adminPage.showErrorDialog("Error", "Gagal memproses permintaan.");
         }
     }
 }

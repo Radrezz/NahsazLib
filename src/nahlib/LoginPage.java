@@ -125,6 +125,15 @@ public class LoginPage extends JFrame {
         showPasswordCheck.addActionListener(e -> tfPass.setEchoChar(showPasswordCheck.isSelected() ? (char)0 : '•'));
         optRow.add(showPasswordCheck, BorderLayout.WEST);
         
+        JButton btnForgot = new JButton("Lupa Sandi?");
+        btnForgot.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btnForgot.setForeground(new Color(230, 50, 50));
+        btnForgot.setContentAreaFilled(false);
+        btnForgot.setBorderPainted(false);
+        btnForgot.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnForgot.addActionListener(e -> showForgotWindow());
+        optRow.add(btnForgot, BorderLayout.EAST);
+        
         gbc.gridy = 4; gbc.insets = new Insets(0, 0, 25, 0);
         formPanel.add(optRow, gbc);
         
@@ -362,10 +371,10 @@ public class LoginPage extends JFrame {
                 return; 
             }
 
-            // Menggunakan DB.query dari DB.java yang sudah ada
+            // Login with Username OR Email
             List<Map<String,String>> rows = DB.query(
-                    "SELECT * FROM users WHERE username = ? AND password_hash = ? AND status_aktif = 1",
-                    u, Utils.sha256(p)
+                    "SELECT * FROM users WHERE (username = ? OR email = ?) AND password_hash = ? AND status_aktif = 1",
+                    u, u, Utils.sha256(p)
             );
             
             if (rows.isEmpty()) { 
@@ -407,6 +416,69 @@ public class LoginPage extends JFrame {
             ex.printStackTrace();
             Utils.msg("Terjadi error saat login: " + ex.getMessage());
         }
+    }
+
+    private void showForgotWindow() {
+        JDialog d = new JDialog(this, "Permintaan Lupa Sandi", true);
+        d.setSize(400, 400);
+        d.setLocationRelativeTo(this);
+        d.setLayout(new GridBagLayout());
+        d.getContentPane().setBackground(new Color(25, 28, 40));
+        
+        GridBagConstraints g = new GridBagConstraints();
+        g.fill = GridBagConstraints.HORIZONTAL;
+        g.weightx = 1.0;
+        
+        JLabel hint = new JLabel("<html><center>Masukkan Username/Email dan sandi baru Anda.<br>" +
+                               "Permintaan akan dikirimkan ke Admin untuk disetujui.</center></html>");
+        hint.setForeground(new Color(176, 179, 190));
+        hint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        hint.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        g.gridy = 0; g.insets = new Insets(20, 20, 20, 20);
+        d.add(hint, g);
+        
+        g.insets = new Insets(8, 20, 8, 20);
+        JTextField tfId = Utils.input("Username/Email");
+        JPasswordField tfNew = Utils.passInput("Sandi Baru");
+        JPasswordField tfConf = Utils.passInput("Konfirmasi Sandi Baru");
+        
+        g.gridy = 1; d.add(createLabel("USERNAME / EMAIL"), g);
+        g.gridy = 2; d.add(tfId, g);
+        g.gridy = 3; d.add(createLabel("SANDI BARU"), g);
+        g.gridy = 4; d.add(tfNew, g);
+        g.gridy = 5; d.add(createLabel("KONFIRMASI SANDI"), g);
+        g.gridy = 6; d.add(tfConf, g);
+        
+        JButton submit = Utils.primaryButton("Kirim Permintaan");
+        submit.addActionListener(e -> {
+            try {
+                String id = tfId.getText().trim();
+                String np = new String(tfNew.getPassword());
+                String cp = new String(tfConf.getPassword());
+                
+                if (id.isEmpty() || np.isEmpty()) { Utils.msg("Mohon isi semua data."); return; }
+                if (!np.equals(cp)) { Utils.msg("Konfirmasi sandi tidak sesuai."); return; }
+                
+                var userRow = DB.query("SELECT user_id FROM users WHERE username=? OR email=?", id, id);
+                if (userRow.isEmpty()) { Utils.msg("User tidak ditemukan."); return; }
+                
+                int uid = Integer.parseInt(userRow.get(0).get("user_id"));
+                DB.exec("INSERT INTO password_requests(user_id, new_password_hash) VALUES(?, ?)", 
+                        uid, Utils.sha256(np));
+                
+                Utils.msg("Permintaan berhasil terkirim. Mohon tunggu konfirmasi Admin.");
+                d.dispose();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                Utils.msg("Gagal: " + ex.getMessage());
+            }
+        });
+        
+        g.gridy = 7; g.insets = new Insets(20, 20, 10, 20);
+        d.add(submit, g);
+        
+        d.setVisible(true);
     }
 
     public static void main(String[] args) {

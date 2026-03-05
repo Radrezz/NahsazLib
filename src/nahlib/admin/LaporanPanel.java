@@ -337,10 +337,11 @@ public class LaporanPanel extends JPanel {
             boolean formatStatus = s != null && !s.equals(Lang.get("filter.all_status"));
             
             StringBuilder query = new StringBuilder(
-                "SELECT l.loan_id, l.tanggal_pinjam, l.jatuh_tempo, u.nama_lengkap anggota, p.nama_lengkap petugas, l.status, " +
+                "SELECT l.loan_id, l.tanggal_pinjam, l.jatuh_tempo, " +
+                "IFNULL(u.nama_lengkap, l.guest_name) anggota, p.nama_lengkap petugas, l.status, " +
                 "(SELECT SUM(qty) FROM loan_items li WHERE li.loan_id=l.loan_id) total_item " +
                 "FROM loans l " +
-                "JOIN users u ON l.user_id=u.user_id " +
+                "LEFT JOIN users u ON l.user_id=u.user_id " +
                 "JOIN users p ON l.petugas_id=p.user_id " +
                 "WHERE 1=1 "
             );

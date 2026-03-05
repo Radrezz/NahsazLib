@@ -200,13 +200,13 @@ public class AdminPage extends JFrame {
         // =========== CONTENT PANELS ===========
         content.setBackground(Utils.BG);
         
-        DashboardPanel dashboard = new DashboardPanel((AdminPage)this);
-        PetugasPanel petugas = new PetugasPanel((AdminPage)this);
-        AnggotaPanel anggota = new AnggotaPanel((AdminPage)this);
-        BukuPanel buku = new BukuPanel((AdminPage)this);
-        LaporanPanel laporan = new LaporanPanel((AdminPage)this);
-        SettingsPanel settings = new SettingsPanel((AdminPage)this);
-        AuditPanel audit = new AuditPanel((AdminPage)this);
+        final DashboardPanel dashboard = new DashboardPanel((AdminPage)this);
+        final PetugasPanel petugas = new PetugasPanel((AdminPage)this);
+        final AnggotaPanel anggota = new AnggotaPanel((AdminPage)this);
+        final BukuPanel buku = new BukuPanel((AdminPage)this);
+        final LaporanPanel laporan = new LaporanPanel((AdminPage)this);
+        final SettingsPanel settings = new SettingsPanel((AdminPage)this);
+        final AuditPanel audit = new AuditPanel((AdminPage)this);
         
         panels.put("dash", dashboard);
         panels.put("petugas", petugas);
@@ -384,6 +384,14 @@ public class AdminPage extends JFrame {
             if (navButtons[i] != null) {
                 applyButtonStyle(navButtons[i], i == activeIndex);
             }
+        }
+    }
+    
+    public void updateNavBadge(int index, int count) {
+        if (index >= 0 && index < navButtons.length && navButtons[index] != null) {
+            String label = navButtons[index].getText().replaceAll(" \\(\\d+\\)", "");
+            if (count > 0) label += " (" + count + ")";
+            navButtons[index].setText(label);
         }
     }
     

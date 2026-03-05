@@ -77,6 +77,7 @@ public class Lang {
         add("msg.select_member", "Silakan pilih anggota terlebih dahulu", "Please select a member first");
         add("msg.select_book", "Silakan pilih buku terlebih dahulu", "Please select a book first");
         add("msg.invalid_qty", "Jumlah tidak valid", "Invalid quantity");
+        add("msg.invalid_name", "Nama tidak boleh kosong", "Name cannot be empty");
         
         // === NAVIGATION ===
         add("nav.dashboard", "Dashboard", "Dashboard");

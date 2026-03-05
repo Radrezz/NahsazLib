@@ -359,6 +359,33 @@ public class DB {
             } catch (SQLException e) {
                 exec("ALTER TABLE books ADD COLUMN description TEXT");
             }
+
+            // PERUBAHAN: Dukungan Peminjaman Tamu (Guest)
+            try {
+                // Pastikan user_id bisa NULL
+                conn.createStatement().execute("ALTER TABLE loans MODIFY user_id INT NULL");
+                // Tambah kolom guest_name jika belum ada
+                try {
+                    conn.createStatement().executeQuery("SELECT guest_name FROM loans LIMIT 1");
+                } catch (SQLException e) {
+                    exec("ALTER TABLE loans ADD COLUMN guest_name VARCHAR(255) NULL");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // Create 'password_requests' table for Forgot Password feature
+            try {
+                exec("CREATE TABLE IF NOT EXISTS password_requests (" +
+                     "request_id INT AUTO_INCREMENT PRIMARY KEY, " +
+                     "user_id INT, " +
+                     "new_password_hash VARCHAR(255), " +
+                     "status VARCHAR(20) DEFAULT 'PENDING', " + // PENDING, APPROVED, REJECTED
+                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                     "FOREIGN KEY (user_id) REFERENCES users(user_id))");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         } catch (Exception ignored) { }
     }
 }

@@ -262,10 +262,10 @@ public class PengembalianPanel extends JPanel {
         try {
             model.setRowCount(0);
             List<Map<String, String>> rows = DB.query(
-                "SELECT l.loan_id, u.nama_lengkap as anggota, l.tanggal_pinjam, l.jatuh_tempo, " +
+                "SELECT l.loan_id, IFNULL(u.nama_lengkap, l.guest_name) as anggota, l.tanggal_pinjam, l.jatuh_tempo, " +
                 "GREATEST(DATEDIFF(CURDATE(), l.jatuh_tempo), 0) as telat, " +
                 "(SELECT SUM(qty) FROM loan_items li WHERE li.loan_id = l.loan_id) as total_item " +
-                "FROM loans l JOIN users u ON l.user_id = u.user_id " +
+                "FROM loans l LEFT JOIN users u ON l.user_id = u.user_id " +
                 "WHERE l.status = 'AKTIF' AND l.petugas_id = ? " +
                 "ORDER BY l.loan_id DESC",
                 Integer.parseInt(petugasPage.getMe().get("user_id"))

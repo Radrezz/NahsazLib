@@ -38,11 +38,13 @@ public class NotifPanel extends JPanel {
         header.setBackground(Utils.BG);
         header.setBorder(new EmptyBorder(20, 20, 20, 20));
         
-        JLabel title = new JLabel(Lang.get("nav.notifications"));
+        JLabel title = new JLabel(Lang.get("nav.notifications"), 
+            new nahlib.CustomIcon(nahlib.CustomIcon.Type.AUDIT, 24, Utils.ACCENT), SwingConstants.LEFT);
         title.setForeground(Utils.TEXT);
-        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        title.setIconTextGap(12);
         
-        JLabel subtitle = new JLabel(Lang.get("user.wishlist.subtitle")); // Reuse or add new if needed
+        JLabel subtitle = new JLabel("Cek status keterlambatan dan estimasi denda peminjaman Anda");
         subtitle.setForeground(Utils.MUTED);
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         
@@ -51,16 +53,8 @@ public class NotifPanel extends JPanel {
         titlePanel.add(title, BorderLayout.NORTH);
         titlePanel.add(subtitle, BorderLayout.SOUTH);
         
-        btnRefresh = new JButton("Refresh");
-        btnRefresh.setFont(Utils.FONT);
-        btnRefresh.setBackground(Utils.CARD);
-        btnRefresh.setForeground(Utils.TEXT);
-        btnRefresh.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Utils.BORDER),
-            new EmptyBorder(6, 12, 6, 12)
-        ));
-        btnRefresh.setFocusPainted(false);
-        btnRefresh.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnRefresh = userPage.createSecondaryButton("Segarkan");
+        btnRefresh.setIcon(new nahlib.CustomIcon(nahlib.CustomIcon.Type.REPORTS, 16, Utils.TEXT));
         btnRefresh.addActionListener(e -> refresh());
         
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -83,17 +77,14 @@ public class NotifPanel extends JPanel {
         
         summaryLabel = new JLabel();
         summaryLabel.setForeground(Utils.TEXT);
-        summaryLabel.setFont(Utils.FONT);
+        summaryLabel.setFont(Utils.FONT_B);
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setOpaque(false);
         
-         JButton remindBtn = userPage.createPrimaryButton(Lang.get("user.quickaction.notification"));
-        
-        btnRefresh.addActionListener(e -> refresh());
+        JButton remindBtn = userPage.createPrimaryButton("Detail Pengingat");
         remindBtn.addActionListener(e -> createReminder());
         
-        buttonPanel.add(btnRefresh);
         buttonPanel.add(remindBtn);
         
         actionPanel.add(summaryLabel, BorderLayout.WEST);

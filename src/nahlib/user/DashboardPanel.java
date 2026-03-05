@@ -299,8 +299,12 @@ public class DashboardPanel extends JPanel {
             List<Double> readData = List.of(2.0, 5.0, 3.0, 7.0, 4.0, 8.0);
             barChart.setData(months, readData);
 
-            if (d > 0 || o > 0) {
-                // showMessageDialog("Peringatan", ... );
+            if (o > 0) {
+                userPage.showMessageDialog(Lang.get("msg.warning"), 
+                    "Sistem mendeteksi ada " + o + " peminjaman yang TERLAMBAT. Mohon segera cek menu notifikasi.");
+            } else if (d > 0) {
+                userPage.showMessageDialog(Lang.get("msg.info"), 
+                    "Anda memiliki " + d + " peminjaman yang akan segera jatuh tempo dalam 24 jam ke depan.");
             }
         } catch (Exception e) {
             e.printStackTrace();
